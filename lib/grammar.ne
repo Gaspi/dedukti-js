@@ -52,9 +52,9 @@ const lexer = makeLexer({
 lines -> line:* {% ([t]) => t %}
 
 line ->
-    %ID _:? param:* %COLON term       %END {% ([name,params,,ty,     ]) => Decl(name,params,ty) %}
-  | %ID param:* %COLON term %DEF term %END {% ([name,params,,ty,,def,]) => Def(name,params,ty,def) %}
-  | %ID:? %COLON term %LONGARROW term %END {% ([name,,lhs,,rhs,]) => Rew(lhs,rhs,name) %}
+    %ID _:? param:* %COLON term       %END {% ([id,params,,ty,     ]) => Decl(id.value,params,ty) %}
+  | %ID param:* %COLON term %DEF term %END {% ([id,params,,ty,,def,]) => Def(id.value,params,ty,def) %}
+  | %ID:? %COLON term %LONGARROW term %END {% ([id,,lhs,,rhs,]) => Rew(lhs,rhs,id.value) %}
   | %CMD_REQ    %ID               %END {% ([,id])    => CmdReq(id)     %}
   | %CMD_EVAL   term              %END {% ([,t])     => CmdEval(t)     %}
   | %CMD_INFER  term              %END {% ([,t])     => CmdInfer(t)    %}
@@ -69,21 +69,21 @@ _args -> %COMMA term {% ([,t]) => t %}
 sterm ->
     %STAR                       {% () => Star() %}
   | %TYPE                       {% () => Typ()  %}
-  | %ID %LEFTSQU args %RIGHTSQU {% ([name,,args]) => MVar(name,args) %}
-  | %ID                         {% ([id]) => PreScope(id) %}
-  | %LEFTPAR term %RIGHTPAR     {% ([,t,]) => t %}
+  | %ID %LEFTSQU args %RIGHTSQU {% ([id,,args]) => MVar(id.value,args) %}
+  | %ID                         {% ([id]) => PreScope(id.value) %}
+  | %LEFTPAR term %RIGHTPAR     {% ([,t,]) => t.value %}
 
 aterm -> sterm sterm:* {% ([te,ts]) => app(te,ts) %}
 
 term ->
     aterm                                           {% ([t]) => t %}
-  | %ID %COLON aterm %ARROW term                    {% ([ name,,dom, ,cod]) => All(name,dom,cod) %}
-  | %LEFTPAR %ID %COLON aterm %RIGHTPAR %ARROW term {% ([,name,,dom,,,cod]) => All(name,dom,cod) %}
+  | %ID %COLON aterm %ARROW term                    {% ([ id,,dom, ,cod]) => All(id.value,dom,cod) %}
+  | %LEFTPAR %ID %COLON aterm %RIGHTPAR %ARROW term {% ([,id,,dom,,,cod]) => All(id.value,dom,cod) %}
   | aterm %ARROW term                               {% ([    dom, ,cod])    => All(null,dom,cod) %}
-  | %ID %FATARROW term                              {% ([name,,body])       => Lam(name,Star(),body) %}
-  | %ID %COLON aterm %FATARROW term                 {% ([name,,type,,body]) => Lam(name,type,body) %}
+  | %ID %FATARROW term                              {% ([id,,body])       => Lam(id.value,Star(),body) %}
+  | %ID %COLON aterm %FATARROW term                 {% ([id,,type,,body]) => Lam(id.value,type,body) %}
   | %LEFTPAR %ID %COLON aterm %DEF aterm %RIGHTPAR %FATARROW term
-    {% ([,name,,type,,val,,,body]) => App(Lam(name,type,body), val) %}
+    {% ([,id,,type,,val,,,body]) => App(Lam(id.value,type,body), val) %}
 
 # Whitespace
 _ -> %WS:? {% function() {} %}

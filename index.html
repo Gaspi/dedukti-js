@@ -4,14 +4,14 @@
   <title> Dedukti </title>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="shortcut icon" type="image/png" href="favicon.png"/>
+  <link rel="shortcut icon" type="image/png" href="ressources/favicon.png"/>
   
   <!-- Leaflet and Bootstrap: CSS style -->
   <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/fontawesome.min.css"> -->
-  <link rel="stylesheet" href="fontawesome.min.css">
+  <link rel="stylesheet" href="ressources/fontawesome.min.css">
   
   <!-- <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous"> -->
-  <link rel="stylesheet" href="bootstrap.min.css">
+  <link rel="stylesheet" href="ressources/bootstrap.min.css">
 
   <style> foo { background: black; } </style>
 </head>
@@ -38,10 +38,10 @@ f : (x:A) -> A := x => x;
 
 
   <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script> -->
-<script src="bootstrap.bundle.min.js"></script>
-<script src="term.js"></script>
+<script src="ressources/bootstrap.bundle.min.js"></script>
+<script src="lib/term.js"></script>
 <script src="moo/moo.js"></script>
-<script src="grammar.js"></script>
+<script src="lib/grammar.js"></script>
 <script src="nearley/lib/nearley.js"></script>
 <script>
 function add_env_rule(env, qualname, rule) {get(env,qualname).rules.push(rule); }
@@ -108,17 +108,18 @@ function show(term, ctx = Ctx()) {
     case "Typ":
       return "Type";
     case "All":
-      var name = term.name;
-      var bind = show(term.bind, extend(ctx, [term.name, null]));
-      var body = show(term.body, extend(ctx, [term.name, null]));
-      return "{" + name + " : " + bind + "} " + body;
+      let dom = show(term.dom, extend(ctx, [term.name, null]));
+      let cod = show(term.cod, extend(ctx, [term.name, null]));
+      return "(" + term.name + " : " + dom + ") -> " + cod;
     case "Lam":
-      var name = term.name;
-      var bind = term.bind && show(term.bind, extend(ctx, [name, null]));
-      var body = show(term.body, extend(ctx, [name, null]));
-      return bind ? "[" + name + " : " + bind + "] " + body : "[" + name + "] " + body;
+      let body = show(term.body, extend(ctx, [name, null]));
+      if (term.bind) {
+        return "(" + term.name + " : " + show(term.bind, extend(ctx, [name, null])) + ") => " + body;
+      } else {
+        return term.name + " => " + body;
+      }
     case "App":
-      var text = ")";
+      let text = ")";
       let vterm = term;
       while (vterm[c] === "App") {
         text = " " + show(vterm.argm, ctx) + text;
@@ -127,6 +128,12 @@ function show(term, ctx = Ctx()) {
       return "(" + show(vterm, ctx) + text;
     case "Ref":
       return term.name;
+    case "PreScope":
+      return '?'+term.name;
+    case "Star":
+      return '*';
+    case "MVar":
+      return term.name+"["+term.args.map((x)=>show(x)).join(',')+"]";
   }
 }
 
@@ -402,38 +409,38 @@ function log(title,msg,classes=[]) {
   document.getElementById("output").appendChild(div);
 }
 
+function check_instruction(env, ins) {
+  switch (ins[c]) {
+  case "Print":
+    log_info("Show",show(ins.term));
+    break;
+  case "Decl":
+    log_ok("Symbol declared",ins.name+" with type " +show(ins.type) );
+    break;
+  case "Def":
+    log_ok("Symbol defined",
+      (ins.name || 'unnamed')+
+      " with type " + (ins.type ? show(ins.type) : 'undefined')+
+      " and definition "+(ins.def ? show(ins.def) : 'udnefined'));
+    break;
+  case "Rew":
+    log_ok("Rewrite rule added",show(ins.lhs)+ " --\> " + show(ins.rhs));
+    break;
+  }
+}
+
 function typecheck() {
   clear();
-  let blocks;
+  let instructions;
   try {
-    blocks = parse( document.getElementById("code").value );
+    instructions = parse( document.getElementById("code").value );
   } catch(err) {
     log_err("Parsing error: "+err);
     return;
   }
   log_ok("Parsing","done.");
-  
-  for(let i = 0; i < blocks.length; i++) {
-    let block = blocks[i];
-    console.log(block);
-    switch (block[c]) {
-    case "Print":
-      log_info("Show",show(block.term));
-      break;
-    case "Decl":
-      log_ok("Symbol declared",block.name+" with type " +show(block.type) );
-      break;
-    case "Def":
-      log_ok("Symbol defined",
-        (block.name || 'unnamed')+
-        " with type " + (block.type ? show(block.type) : 'undefined')+
-        " and definition "+(block.def ? show(block.def) : 'udnefined'));
-      break;
-    case "Rew":
-      log_ok("Rewrite rule added",show(block.lhs)+ " --\> " + show(block.rhs));
-      break;
-    }
-  }
+  let env = Env();
+  instructions.forEach((ins)=>check_instruction(env,ins));
   log_ok("All done !");
 }
 
