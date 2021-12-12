@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title> Dedukti </title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" type="image/png" href="favicon.png"/>
+  
+  <!-- Leaflet and Bootstrap: CSS style -->
+  <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/fontawesome.min.css"> -->
+  <link rel="stylesheet" href="fontawesome.min.css">
+  
+  <!-- <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous"> -->
+  <link rel="stylesheet" href="bootstrap.min.css">
+
+  <style> foo { background: black; } </style>
+</head>
+<body>
+
+
+<div class="container">
+  <button class="" onclick="typecheck();">Type Check !</button>
+  <div class="row align-items-start">
+    <div class="col mx-3">
+      <h1>Code</h1>
+      <div class="form-outline mx-3">
+        <textarea class="form-control" id="code" rows="8">
+A : Type;
+f : (x:A) -> A := x => x;
+#PRINT A;
+        </textarea>
+      </div>
+    </div>
+    <div class="col mx-3">
+      <h1>Ouput</h1>
+      <div class="mx-3" id="output"></div>
+    </div>
+
+
+  <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script> -->
+<script src="bootstrap.bundle.min.js"></script>
+<script src="term.js"></script>
+<script src="moo/moo.js"></script>
+<script src="grammar.js"></script>
+<script src="nearley/lib/nearley.js"></script>
+<script>
+function add_env_rule(env, qualname, rule) {get(env,qualname).rules.push(rule); }
+
+
+function get_bind(ctx, i, j = 0) {
+  if (!ctx) {
+    return null;
+  } else if (j < i) {
+    return get_bind(ctx.tail, i, j + 1);
+  } else {
+    return [ctx.head[0], ctx.head[1] ? shift(ctx.head[1], i, 0) : null];
+  }
+}
+
+function get_name(ctx, i) {
+  const count = (ctx, name, i) => {
+    return i === 0 ? 0 : (ctx.head[0] === name ? 1 : 0) + count(ctx.tail, name, i - 1);
+  }
+  const repeat = (str, i) => {
+    return i === 0 ? "" : str + repeat(str, i - 1);
+  }
+  let bind = get_bind(ctx, i);
+  if (bind) {
+    return bind[0] + repeat("'", count(ctx, bind[0], i));
+  } else {
+    return "#" + i;
+  }
+}
+
+function get_term(ctx, i) {
+  let bind = get_bind(ctx, i);
+  return bind ? bind[1] : null;
+}
+
+function index_of(ctx, name, skip, i = 0) {
+  if (!ctx) {
+    return null;
+  } else if (ctx.head[0] === name && skip > 0) {
+    return index_of(ctx.tail, name, skip - 1, i + 1);
+  } else if (ctx.head[0] !== name) {
+    return index_of(ctx.tail, name, skip, i + 1);
+  } else {
+    return i;
+  }
+}
+
+// Pretty prints a context
+function show_context(ctx, i = 0) {
+  var bind = get_bind(ctx, i);
+  if (bind) {
+    var term = " : " + (bind[1] ? show(norm(bind[1], {}, true), ctx) : "?");
+    return show_context(ctx, i + 1) + bind[0] + term + "\n";
+  } else {
+    return "";
+  }
+}
+
+// Converts a term to a string
+function show(term, ctx = Ctx()) {
+  switch (term[c]) {
+    case "Var":
+      return get_name(ctx, term.index) || "#" + term.index;
+    case "Typ":
+      return "Type";
+    case "All":
+      var name = term.name;
+      var bind = show(term.bind, extend(ctx, [term.name, null]));
+      var body = show(term.body, extend(ctx, [term.name, null]));
+      return "{" + name + " : " + bind + "} " + body;
+    case "Lam":
+      var name = term.name;
+      var bind = term.bind && show(term.bind, extend(ctx, [name, null]));
+      var body = show(term.body, extend(ctx, [name, null]));
+      return bind ? "[" + name + " : " + bind + "] " + body : "[" + name + "] " + body;
+    case "App":
+      var text = ")";
+      let vterm = term;
+      while (vterm[c] === "App") {
+        text = " " + show(vterm.argm, ctx) + text;
+        vterm = vterm.func;
+      }
+      return "(" + show(vterm, ctx) + text;
+    case "Ref":
+      return term.name;
+  }
+}
+
+// Create a Parser object from our grammar.
+const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
+const initial_state = parser.save();
+
+// Converts a string to a series of instructions
+function parse(code) {
+  parser.restore(initial_state);
+  parser.feed(code);
+  return parser.results[0];
+}
+
+// Shifts a term
+function shift(term, inc, depth) {
+  switch (term[c]) {
+    case "Var":
+      return Var(term.index < depth ? term.index : term.index + inc);
+    case "Typ":
+      return Typ();
+    case "All":
+      var name = term.name;
+      var bind = shift(term.bind, inc, depth + 1);
+      var body = shift(term.body, inc, depth + 1);
+      return All(name, bind, body);
+    case "Lam":
+      var name = term.name;
+      var bind = term.bind && shift(term.bind, inc, depth + 1);
+      var body =              shift(term.body, inc, depth + 1);
+      return Lam(name, bind, body);
+    case "App":
+      var func = shift(term.func, inc, depth);
+      var argm = shift(term.argm, inc, depth);
+      return App(func, argm);
+    case "Ref":
+      return Ref(term.name);
+  }
+}
+
+// Checks if two terms are equal
+function equals(a, b, env) {
+  const Eql = (a, b)    => ["Eql", {a, b}];
+  const Bop = (v, x, y) => ["Bop", {v, x, y}];
+  const Val = (v)       => ["Val", {v}];
+
+  const step = (node) => {
+    switch (node[0]) {
+      // An equality test
+      case "Eql":
+        var {a, b} = node[1];
+
+        // Gets whnfs with and without dereferencing
+        var ax = norm(a, {}, false);
+        var bx = norm(b, {}, false);
+        var ay = norm(a, env, false);
+        var by = norm(b, env, false);
+
+        // Optional optimization: if hashes are equal, then a == b
+        if (a[2] === b[2] || ax[2] === bx[2] || ay[2] === by[2]) {
+          return Val(true);
+        }
+
+        // If non-deref whnfs are app and fields are equal, then a == b
+        var x = null;
+        if (ax[2] !== ay[2] || bx[2] !== by[2]) {
+          if (ax[0] === "Ref" && bx[0] === "Ref" && ax[1].name === bx[1].name) {
+            x = Val(true);
+          } else if (ax[0] === "App" && bx[0] === "App") {
+            var func = Eql(ax[1].func, bx[1].func);
+            var argm = Eql(ax[1].argm, bx[1].argm);
+            x = Bop(false, func, argm);
+          }
+        }
+
+        // If whnfs are equal and fields are equal, then a == b
+        var y = null;
+        if (ay[0] === "Typ" && by[0] === "Typ") {
+          y = Val(true);
+        } else if (ay[0] === "All" && by[0] === "All") {
+          y = Bop(false, Eql(ay[1].bind, by[1].bind), Eql(ay[1].body, by[1].body));
+        } else if (ay[0] === "Lam" && by[0] === "Lam") {
+          y = Eql(ay[1].body, by[1].body)
+        } else if (ay[0] === "App" && by[0] === "App") {
+          y = Bop(false, Eql(ay[1].func, by[1].func), Eql(ay[1].argm, by[1].argm));
+        } else if (ay[0] === "Var" && by[0] === "Var") {
+          y = Val(ay[1].index === by[1].index);
+        } else {
+          y = Val(false);
+        }
+
+        return x ? Bop(true, x, y) : y;
+
+      // A binary operation (or / and)
+      case "Bop":
+        var {v, x, y} = node[1];
+        if (x[0] === "Val") {
+          return x[1].v === v ? Val(v) : y;
+        } else if (y[0] === "Val") {
+          return y[1].v === v ? Val(v) : x;
+        } else {
+          return Bop(v, step(x), step(y));
+        }
+
+      // A result value (true / false)
+      case "Val":
+        return node;
+    }
+  }
+
+  // Expands the search tree until it finds an answer
+  let tree = Eql(a, b);
+  while (tree[c] !== "Val") {
+    tree = step(tree);
+  }
+  return tree.v;
+}
+
+// Reduces a term to normal form or head normal form
+function norm(term, defs, full) {
+  const cont = full ? norm : (x => x);
+  const apply = (func, argm) => {
+    var func = norm(func, defs, false);
+    if (func[c] === "Lam") {
+      return norm(subst(func.body, argm, 0), defs, full);
+    } else {
+      return App(cont(func, defs, false), cont(argm, defs, full));
+    }
+  }
+  const dereference = (name) => {
+    if (defs[name] && !defs[name].seen) {
+      return norm(defs[name].term, defs, full);
+    } else {
+      return Ref(name);
+    }
+  }
+  switch (term[c]) {
+    case "Var": return Var(term.index);
+    case "Typ": return Typ();
+    case "All": return All(term.name, cont(term.bind, defs, false), cont(term.body, defs, full));
+    case "Lam": return Lam(term.name, term.bind && cont(term.bind, defs, false), cont(term.body, defs, full)); 
+    case "App": return apply(term.func, term.argm);
+    case "Ref": return dereference(term.name);
+  }
+}
+
+// Substitution
+function subst(term, val, depth) {
+  switch (term[c]) {
+    case "Var":
+      return depth === term.index ? val : Var(term.index - (term.index > depth ? 1 : 0));
+    case "Typ":
+      return Typ();
+    case "All":
+      var name = term.name;
+      var bind = subst(term.bind, val && shift(val, 1, 0), depth + 1);
+      var body = subst(term.body, val && shift(val, 1, 0), depth + 1);
+      return All(name, bind, body);
+    case "Lam":
+      var name = term.name;
+      var bind = term.bind && subst(term.bind, val && shift(val, 1, 0), depth + 1);
+      var body =              subst(term.body, val && shift(val, 1, 0), depth + 1);
+      return Lam(name, bind, body);
+    case "App":
+      var func = subst(term.func, val, depth);
+      var argm = subst(term.argm, val, depth);
+      return App(func, argm);
+    case "Ref":
+      var name = term.name;
+      return Ref(name);
+  }
+}
+
+// Infers the type of a term
+function infer(term, env, ctx = Ctx()) {
+  switch (term[c]) {
+    case "Typ":
+      return Typ();
+    case "All":
+      var ex_ctx = extend(ctx, [term.name, term.bind]);
+      var bind_t = infer(term.bind, env, ex_ctx);
+      var body_t = infer(term.body, env, ex_ctx);
+      if (!equals(bind_t, Typ(), env, ctx) || !equals(body_t, Typ(), env, ctx)) {
+        throw "[ERROR]\nForall not a type: `" + show(term, ctx) + "`.\n\n[CONTEXT]\n" + show_context(ctx);
+      }
+      return Typ();
+    case "Lam":
+      if (term.bind === null) {
+        throw "[ERROR]\nCan't infer non-annotated lambda `"+show(term,ctx)+"`.\n\n[CONTEXT]\n" + show_context(ctx);
+      } else {
+        var ex_ctx = extend(ctx, [term.name, term.bind]);
+        var body_t = infer(term.body, env, ex_ctx);
+        var term_t = All(term.name, term.bind, body_t);
+        infer(term_t, env, ctx);
+        return term_t;
+      }
+    case "App":
+      var func_t = norm(infer(term.func, env, ctx), env, false);
+      if (func_t[c] !== "All") {
+        throw "[ERROR]\nNon-function application on `" + show(term, ctx) + "`.\n\n[CONTEXT]\n" + show_context(ctx);
+      }
+      var bind_t = subst(func_t.bind, term.argm, 0);
+      var argm_v = check(term.argm, bind_t, env, ctx, () => "`" + show(term, ctx) + "`'s argument");
+      return subst(func_t.body, argm_v, 0);
+    case "Ref":
+      let def = get(env,term.name);
+      if (def) {
+        if (def.done) {
+          return def.type;
+        } else {
+          def.done = true;
+          if (def.type) {
+            check(def.term, def.type, env, ctx, () => "`" + term.name + "`'s annotated type");
+          } else {
+            def.type = infer(def.term, env, ctx);
+          }
+          return def.type;
+        }
+      } else {
+        throw "[ERROR]\nUndefined reference: `" + term.name + "`.";
+      }
+    case "Var":
+      return get_term(ctx, term[1].index);
+  }
+}
+
+// Checks if a term has given type
+function check(term, type, env, ctx = Ctx(), expr) {
+  var expr = expr || (() => show(term, ctx));
+  var type = norm(type, env, false);
+  if (type[0] === "All" && term[0] === "Lam" && !term[1].bind) {
+    infer(type, env, ctx);
+    var ex_ctx = extend(ctx, [type[1].name, type[1].bind]);
+    var body_v = check(term[1].body, type[1].body, env, ex_ctx, () => "`" + show(term, ctx) + "`'s body");
+    return Lam(type[1].name, type[1].bind, body_v);
+  } else {
+    var term_t = infer(term, env, ctx);
+    try {
+      var checks = equals(type, term_t, env, ctx);
+    } catch (e) {
+      var checks = false;
+      console.log("Couldn't decide if terms are equal.");
+      console.log(e);
+    }
+    if (!checks) {
+      throw show_mismatch(type, norm(term_t, env, false), expr, ctx);
+    }
+    return term;
+  }
+}
+
+// Formats a type-mismatch error message
+function show_mismatch(expect, actual, expr, ctx) {
+  return
+    "[ERROR]\nType mismatch on " + expr() + "."       +"\n"+
+    "- Expect = " + show(norm(expect, {}, true), ctx) +"\n"+
+    "- Actual = " + show(norm(actual, {}, true), ctx) +"\n"+
+    "[CONTEXT]"                                       +"\n"+
+    show_context(ctx);
+}
+
+function clear() { document.getElementById("output").innerHTML = ""; }
+
+function log_ok(title,msg)   { log(title,msg,['alert','alert-success']); }
+function log_info(title,msg) { log(title,msg,['alert','alert-info']); }
+function log_err(title,msg)  { log(title,msg,['alert','alert-danger']); }
+function log_warn(title,msg) { log(title,msg,['alert','alert-warning']); }
+
+function log(title,msg,classes=[]) {
+  let div = document.createElement('div');
+  div.innerHTML = '<strong>'+title+'</strong>'+(msg ? ': '+ msg : '');
+  classes.forEach((x)=>div.classList.add(x));
+  document.getElementById("output").appendChild(div);
+}
+
+function typecheck() {
+  clear();
+  let blocks;
+  try {
+    blocks = parse( document.getElementById("code").value );
+  } catch(err) {
+    log_err("Parsing error: "+err);
+    return;
+  }
+  log_ok("Parsing","done.");
+  
+  for(let i = 0; i < blocks.length; i++) {
+    let block = blocks[i];
+    console.log(block);
+    switch (block[c]) {
+    case "Print":
+      log_info("Show",show(block.term));
+      break;
+    case "Decl":
+      log_ok("Symbol declared",block.name+" with type " +show(block.type) );
+      break;
+    case "Def":
+      log_ok("Symbol defined",
+        (block.name || 'unnamed')+
+        " with type " + (block.type ? show(block.type) : 'undefined')+
+        " and definition "+(block.def ? show(block.def) : 'udnefined'));
+      break;
+    case "Rew":
+      log_ok("Rewrite rule added",show(block.lhs)+ " --\> " + show(block.rhs));
+      break;
+    }
+  }
+  log_ok("All done !");
+}
+
+</script>

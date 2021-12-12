@@ -1,5 +1,7 @@
 # In browser Dedukti
 
+Inspired and adapted from [MaiaVictor/ESCoC](https://github.com/MaiaVictor/ESCoC).
+
 ## Dependencies
 
 ```sh
