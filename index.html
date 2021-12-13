@@ -19,74 +19,112 @@
 
 
 <div class="container">
-  <button class="" onclick="typecheck();">Type Check !</button>
+  <button class="" onclick="check_all_instructions();">Type Check !</button>
   <div class="row align-items-start">
     <div class="col mx-3">
       <h1>Code</h1>
       <div class="form-outline mx-3">
-        <textarea class="form-control" id="code" rows="8">
+<textarea class="form-control" id="code" rows="8">
 A : Type;
-f : (x:A) -> A := x => x;
+f : (x:A) -> A := x => x; // Commentaire
 #PRINT A;
-        </textarea>
+// Test
+
+: x => X[a,A,x] --> X;
+</textarea>
       </div>
     </div>
     <div class="col mx-3">
       <h1>Ouput</h1>
-      <div class="mx-3" id="output"></div>
+      <div class="mx-3" id="logs"></div>
     </div>
 
 
   <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script> -->
 <script src="ressources/bootstrap.bundle.min.js"></script>
 <script src="lib/term.js"></script>
+<script src="lib/context.js"></script>
+<script src="lib/env.js"></script>
 <script src="moo/moo.js"></script>
 <script src="lib/grammar.js"></script>
 <script src="nearley/lib/nearley.js"></script>
 <script>
-function add_env_rule(env, qualname, rule) {get(env,qualname).rules.push(rule); }
 
-
-function get_bind(ctx, i, j = 0) {
-  if (!ctx) {
-    return null;
-  } else if (j < i) {
-    return get_bind(ctx.tail, i, j + 1);
-  } else {
-    return [ctx.head[0], ctx.head[1] ? shift(ctx.head[1], i, 0) : null];
-  }
+// Logs handling
+const logs = document.getElementById("logs");
+function clear_logs() { logs.innerHTML = ""; }
+function log_ok(title,msg)   { log(title,msg,['alert','alert-success']); }
+function log_info(title,msg) { log(title,msg,['alert','alert-info']); }
+function log_warn(title,msg) { log(title,msg,['alert','alert-warning']); }
+function log_err(title,msg)  { log('ERROR: '+title,msg,['alert','alert-danger']); }
+function log(title,msg,classes=[]) {
+  const div = document.createElement('div');
+  div.style['white-space']= 'pre-wrap';
+  div.innerHTML = '<strong>['+title+']</strong> '+msg;
+  classes.forEach((x)=>div.classList.add(x));
+  logs.appendChild(div);
 }
 
-function get_name(ctx, i) {
-  const count = (ctx, name, i) => {
-    return i === 0 ? 0 : (ctx.head[0] === name ? 1 : 0) + count(ctx.tail, name, i - 1);
-  }
-  const repeat = (str, i) => {
-    return i === 0 ? "" : str + repeat(str, i - 1);
-  }
-  let bind = get_bind(ctx, i);
-  if (bind) {
-    return bind[0] + repeat("'", count(ctx, bind[0], i));
-  } else {
-    return "#" + i;
-  }
+// Create a Parser object from our grammar.
+const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
+const initial_state = parser.save();
+
+// Converts a string to a series of instructions
+function parse(code) {
+  parser.restore(initial_state);
+  parser.feed(code);
+  return parser.results[0];
 }
 
-function get_term(ctx, i) {
-  let bind = get_bind(ctx, i);
-  return bind ? bind[1] : null;
-}
-
-function index_of(ctx, name, skip, i = 0) {
-  if (!ctx) {
-    return null;
-  } else if (ctx.head[0] === name && skip > 0) {
-    return index_of(ctx.tail, name, skip - 1, i + 1);
-  } else if (ctx.head[0] !== name) {
-    return index_of(ctx.tail, name, skip, i + 1);
-  } else {
-    return i;
+// In place scoping of (meta-)term and instructions
+function scope(e, env, ctx=Ctx()) {
+  if (!e) { return e; }
+  switch (e[c]) {
+    // Variable, meta-variable or symbol to scope
+    case "PreScope":
+      let i = index_of(ctx,e.name);
+      if (i != null) { return Var (i, preferred_name=e.name); }
+      let s = get(env,e.name);
+      if (s) { return Ref(s.fullname); }
+      return MVar(e.name,[])
+    // (Meta-)term constructors
+      break;
+    case "All":
+      e.dom = scope(e.dom, env, ctx);
+      e.cod = scope(e.cod, env, extend(ctx, [e.name,null]));
+      break;
+    case "Lam":
+      e.type = scope(e.type, env,ctx);
+      e.body = scope(e.body, env, extend(ctx, [e.name,null]));
+      break;
+    case "App":
+      e.func = scope(e.func, env,ctx);
+      e.argm = scope(e.argm, env,ctx);
+      break;
+    case "MVar":
+      for (let i = 0; i < e.args.length; i++) {
+        e.args[i] = scope(e.args[i], env,ctx);
+      }
+      break;
+    // Instruction constructors
+    case "Check":
+      e.type = scope(e.type, env,ctx);
+    case "Eval":
+    case "Infer":
+    case "Print":
+      e.term = scope(e.term, env,ctx);
+      break;
+    case "Def":
+      e.def = scope(e.def, env,ctx);
+    case "Decl":
+      e.type = scope(e.type, env,ctx);
+      break;
+    case "Rew":
+      e.lhs = scope(e.lhs, env,ctx);
+      e.rhs = scope(e.rhs, env,ctx);
+      break;
   }
+  return e;
 }
 
 // Pretty prints a context
@@ -112,9 +150,9 @@ function show(term, ctx = Ctx()) {
       let cod = show(term.cod, extend(ctx, [term.name, null]));
       return "(" + term.name + " : " + dom + ") -> " + cod;
     case "Lam":
-      let body = show(term.body, extend(ctx, [name, null]));
+      let body = show(term.body, extend(ctx, [term.name, null]));
       if (term.bind) {
-        return "(" + term.name + " : " + show(term.bind, extend(ctx, [name, null])) + ") => " + body;
+        return "(" + term.name + " : " + show(term.bind, extend(ctx, [term.name, null])) + ") => " + body;
       } else {
         return term.name + " => " + body;
       }
@@ -133,19 +171,9 @@ function show(term, ctx = Ctx()) {
     case "Star":
       return '*';
     case "MVar":
-      return term.name+"["+term.args.map((x)=>show(x)).join(',')+"]";
+      console.log(term);
+      return term.name+"["+term.args.map((x)=>show(x,ctx)).join(',')+"]";
   }
-}
-
-// Create a Parser object from our grammar.
-const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
-const initial_state = parser.save();
-
-// Converts a string to a series of instructions
-function parse(code) {
-  parser.restore(initial_state);
-  parser.feed(code);
-  return parser.results[0];
 }
 
 // Shifts a term
@@ -176,11 +204,11 @@ function shift(term, inc, depth) {
 
 // Checks if two terms are equal
 function equals(a, b, env) {
-  const Eql = (a, b)    => ["Eql", {a, b}];
-  const Bop = (v, x, y) => ["Bop", {v, x, y}];
-  const Val = (v)       => ["Val", {v}];
+  function Eql(a, b)    { return ["Eql", {a, b}]; }
+  function Bop(v, x, y) { return ["Bop", {v, x, y}]; }
+  function Val(v)       { return ["Val", {v}]; }
 
-  const step = (node) => {
+  function step(node) {
     switch (node[0]) {
       // An equality test
       case "Eql":
@@ -246,9 +274,7 @@ function equals(a, b, env) {
 
   // Expands the search tree until it finds an answer
   let tree = Eql(a, b);
-  while (tree[c] !== "Val") {
-    tree = step(tree);
-  }
+  while (tree[c] !== "Val") { tree = step(tree); }
   return tree.v;
 }
 
@@ -313,16 +339,16 @@ function infer(term, env, ctx = Ctx()) {
     case "Typ":
       return Typ();
     case "All":
-      var ex_ctx = extend(ctx, [term.name, term.bind]);
-      var bind_t = infer(term.bind, env, ex_ctx);
-      var body_t = infer(term.body, env, ex_ctx);
-      if (!equals(bind_t, Typ(), env, ctx) || !equals(body_t, Typ(), env, ctx)) {
-        throw "[ERROR]\nForall not a type: `" + show(term, ctx) + "`.\n\n[CONTEXT]\n" + show_context(ctx);
+      var ex_ctx = extend(ctx, [term.name, term.dom]);
+      let dom_t = infer(term.dom, env, ex_ctx);
+      var cod_t = infer(term.cod, env, ex_ctx);
+      if (!equals(dom_t, Typ(), env, ctx) || !equals(cod_t, Typ(), env, ctx)) {
+        throw "Infer\nForall not a type: `" + show(term, ctx) + "`.\n\n[CONTEXT]\n" + show_context(ctx);
       }
       return Typ();
     case "Lam":
       if (term.bind === null) {
-        throw "[ERROR]\nCan't infer non-annotated lambda `"+show(term,ctx)+"`.\n\n[CONTEXT]\n" + show_context(ctx);
+        throw "Infer:\nCan't infer non-annotated lambda `"+show(term,ctx)+"`.\n\n[CONTEXT]\n" + show_context(ctx);
       } else {
         var ex_ctx = extend(ctx, [term.name, term.bind]);
         var body_t = infer(term.body, env, ex_ctx);
@@ -333,7 +359,7 @@ function infer(term, env, ctx = Ctx()) {
     case "App":
       var func_t = norm(infer(term.func, env, ctx), env, false);
       if (func_t[c] !== "All") {
-        throw "[ERROR]\nNon-function application on `" + show(term, ctx) + "`.\n\n[CONTEXT]\n" + show_context(ctx);
+        throw "Infer:\nNon-function application on `" + show(term, ctx) + "`.\n\n[CONTEXT]\n" + show_context(ctx);
       }
       var bind_t = subst(func_t.bind, term.argm, 0);
       var argm_v = check(term.argm, bind_t, env, ctx, () => "`" + show(term, ctx) + "`'s argument");
@@ -353,10 +379,10 @@ function infer(term, env, ctx = Ctx()) {
           return def.type;
         }
       } else {
-        throw "[ERROR]\nUndefined reference: `" + term.name + "`.";
+        throw "Infer:\nUndefined reference: `" + term.name + "`.";
       }
     case "Var":
-      return get_term(ctx, term[1].index);
+      return get_term(ctx, term.index);
   }
 }
 
@@ -364,84 +390,83 @@ function infer(term, env, ctx = Ctx()) {
 function check(term, type, env, ctx = Ctx(), expr) {
   var expr = expr || (() => show(term, ctx));
   var type = norm(type, env, false);
-  if (type[0] === "All" && term[0] === "Lam" && !term[1].bind) {
+  if (type[c] === "All" && term[c] === "Lam" && !term.bind) {
     infer(type, env, ctx);
-    var ex_ctx = extend(ctx, [type[1].name, type[1].bind]);
-    var body_v = check(term[1].body, type[1].body, env, ex_ctx, () => "`" + show(term, ctx) + "`'s body");
+    const ex_ctx = extend(ctx, [type[1].name, type[1].bind]);
+    const body_v = check(term[1].body, type[1].body, env, ex_ctx, () => "`" + show(term, ctx) + "`'s body");
     return Lam(type[1].name, type[1].bind, body_v);
   } else {
-    var term_t = infer(term, env, ctx);
+    const term_t = infer(term, env, ctx);
+    let checks = false;
     try {
-      var checks = equals(type, term_t, env, ctx);
+      checks = equals(type, term_t, env, ctx);
     } catch (e) {
-      var checks = false;
       console.log("Couldn't decide if terms are equal.");
       console.log(e);
     }
     if (!checks) {
-      throw show_mismatch(type, norm(term_t, env, false), expr, ctx);
+      throw "Check:"                                       +"\n"+
+        "Type mismatch on " + expr() + "."                 +"\n"+
+        "- Expect = " + show(norm(type  , env, true ), ctx)+"\n"+
+        "- Actual = " + show(norm(term_t, env, false), ctx)+"\n"+
+        "[CONTEXT]"                                        +"\n"+
+        show_context(ctx);
     }
     return term;
   }
 }
 
-// Formats a type-mismatch error message
-function show_mismatch(expect, actual, expr, ctx) {
-  return
-    "[ERROR]\nType mismatch on " + expr() + "."       +"\n"+
-    "- Expect = " + show(norm(expect, {}, true), ctx) +"\n"+
-    "- Actual = " + show(norm(actual, {}, true), ctx) +"\n"+
-    "[CONTEXT]"                                       +"\n"+
-    show_context(ctx);
+
+function add_env_rule(env, qualname, rule) { get(env,qualname).rules.push(rule); }
+
+function check_rule(env, lhs, rhs) {
+  // TODO
 }
 
-function clear() { document.getElementById("output").innerHTML = ""; }
-
-function log_ok(title,msg)   { log(title,msg,['alert','alert-success']); }
-function log_info(title,msg) { log(title,msg,['alert','alert-info']); }
-function log_err(title,msg)  { log(title,msg,['alert','alert-danger']); }
-function log_warn(title,msg) { log(title,msg,['alert','alert-warning']); }
-
-function log(title,msg,classes=[]) {
-  let div = document.createElement('div');
-  div.innerHTML = '<strong>'+title+'</strong>'+(msg ? ': '+ msg : '');
-  classes.forEach((x)=>div.classList.add(x));
-  document.getElementById("output").appendChild(div);
-}
-
-function check_instruction(env, ins) {
+function check_instruction(instruction, env) {
+  let ins;
+  try {
+    ins = scope(instruction,env);
+  } catch (err) {
+    log_err("rule",err);
+  }
   switch (ins[c]) {
   case "Print":
     log_info("Show",show(ins.term));
     break;
   case "Decl":
     log_ok("Symbol declared",ins.name+" with type " +show(ins.type) );
+    add_new_symbol(env,ins.name,ins.type);
     break;
   case "Def":
     log_ok("Symbol defined",
       (ins.name || 'unnamed')+
       " with type " + (ins.type ? show(ins.type) : 'undefined')+
-      " and definition "+(ins.def ? show(ins.def) : 'udnefined'));
+      " and definition "+(ins.def ? show(ins.def) : 'undefined'));
     break;
   case "Rew":
-    log_ok("Rewrite rule added",show(ins.lhs)+ " --\> " + show(ins.rhs));
+      check_rule(env,ins.lhs,ins.rhs);
+      log_ok("Rewrite rule added",show(ins.lhs)+ " --\> " + show(ins.rhs));
     break;
   }
 }
 
-function typecheck() {
-  clear();
-  let instructions;
+var code, instructions;
+function check_all_instructions() {
+  clear_logs();
   try {
-    instructions = parse( document.getElementById("code").value );
+    code = document.getElementById("code").value;
+    instructions = parse( code );
+    log_ok("Parsing","done.");
+    let env = Env();
+    instructions.forEach((ins)=>check_instruction(ins,env));
+    log_ok("All done !");
   } catch(err) {
-    log_err("Parsing error: "+err);
+    const i = err.message.indexOf(':');
+    if (i<0) { throw err; }
+    log_err(err.message.slice(0,i),err.message.slice(i+1));
     return;
   }
-  log_ok("Parsing","done.");
-  let env = Env();
-  instructions.forEach((ins)=>check_instruction(env,ins));
-  log_ok("All done !");
 }
 
 </script>

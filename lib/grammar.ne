@@ -52,9 +52,9 @@ const lexer = makeLexer({
 lines -> line:* {% ([t]) => t %}
 
 line ->
-    %ID _:? param:* %COLON term       %END {% ([id,params,,ty,     ]) => Decl(id.value,params,ty) %}
+    %ID param:* %COLON term       %END {% ([id,params,,ty,     ]) => Decl(id.value,params,ty) %}
   | %ID param:* %COLON term %DEF term %END {% ([id,params,,ty,,def,]) => Def(id.value,params,ty,def) %}
-  | %ID:? %COLON term %LONGARROW term %END {% ([id,,lhs,,rhs,]) => Rew(lhs,rhs,id.value) %}
+  | %ID:? %COLON term %LONGARROW term %END {% ([id,,lhs,,rhs,]) => Rew(lhs,rhs, id?id.value:null) %}
   | %CMD_REQ    %ID               %END {% ([,id])    => CmdReq(id)     %}
   | %CMD_EVAL   term              %END {% ([,t])     => CmdEval(t)     %}
   | %CMD_INFER  term              %END {% ([,t])     => CmdInfer(t)    %}
@@ -63,7 +63,7 @@ line ->
 
 param -> %LEFTPAR %ID %COLON term %RIGHTPAR {% ([,v,,ty]) => [v,ty] %}
 
-args  -> null {% () => [] %} | term _args:* {% ([a,args]) => [a]+args %}
+args  -> null {% () => [] %} | term _args:* {% ([a,args]) => [a].concat(args) %}
 _args -> %COMMA term {% ([,t]) => t %}
 
 sterm ->
@@ -84,7 +84,3 @@ term ->
   | %ID %COLON aterm %FATARROW term                 {% ([id,,type,,body]) => Lam(id.value,type,body) %}
   | %LEFTPAR %ID %COLON aterm %DEF aterm %RIGHTPAR %FATARROW term
     {% ([,id,,type,,val,,,body]) => App(Lam(id.value,type,body), val) %}
-
-# Whitespace
-_ -> %WS:? {% function() {} %}
-__ -> %WS  {% function() {} %}
