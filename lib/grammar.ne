@@ -36,11 +36,13 @@ const lexer = makeLexer({
     FATARROW:'=>',
     LONGARROW:'-->',
     TYPE:"Type",
+    KIND:"Kind",
     CMD_REQ  :"#REQUIRE",
     CMD_EVAL :"#EVAL",
     CMD_INFER:"#INFER",
     CMD_CHECK:"#CHECK",
     CMD_PRINT:"#PRINT",
+    QID: /(?:[a-zA-Z0-9_']+\.)+[a-zA-Z0-9_\-!?']+/,
     ID: /[a-zA-Z0-9_!?']+/,
   }, ['_','COMMENT']);
 
@@ -52,26 +54,32 @@ const lexer = makeLexer({
 lines -> line:* {% ([t]) => t %}
 
 line ->
-    %ID param:* %COLON term       %END {% ([id,params,,ty,     ]) => Decl(id.value,params,ty) %}
-  | %ID param:* %COLON term %DEF term %END {% ([id,params,,ty,,def,]) => Def(id.value,params,ty,def) %}
-  | %ID:? %COLON term %LONGARROW term %END {% ([id,,lhs,,rhs,]) => Rew(lhs,rhs, id?id.value:null) %}
-  | %CMD_REQ    %ID               %END {% ([,id])    => CmdReq(id)     %}
-  | %CMD_EVAL   term              %END {% ([,t])     => CmdEval(t)     %}
-  | %CMD_INFER  term              %END {% ([,t])     => CmdInfer(t)    %}
-  | %CMD_CHECK  aterm %COLON term %END {% ([,t,,ty]) => CmdCheck(t,ty) %}
-  | %CMD_PRINT  term              %END {% ([,t])     => CmdPrint(t)    %}
+    %ID param:* %COLON term                 %END {% ([id,params,,ty,     ]) => Decl(id.value,params,ty) %}
+  | %ID param:* %COLON term %DEF term       %END {% ([id,params,,ty,,def,]) => Def(id.value,params,ty,def) %}
+  | %ID:? %COLON term %LONGARROW term       %END {% ([id,,lhs,,rhs,]) => Rew(lhs,rhs, id?id.value:null) %}
+  | %CMD_REQ    %ID                         %END {% ([,id])    => CmdReq(id)     %}
+  | %CMD_REQ    %QID %LEFTSQU %ID %RIGHTSQU %END {% ([,id,,alias,])    => CmdReq(id) %}
+  | %CMD_EVAL   term                        %END {% ([,t])     => CmdEval(t)     %}
+  | %CMD_INFER  term                        %END {% ([,t])     => CmdInfer(t)    %}
+  | %CMD_CHECK  aterm %COLON term           %END {% ([,t,,ty]) => CmdCheck(t,ty) %}
+  | %CMD_PRINT  term                        %END {% ([,t])     => CmdPrint(t)    %}
 
 param -> %LEFTPAR %ID %COLON term %RIGHTPAR {% ([,v,,ty]) => [v,ty] %}
 
 args  -> null {% () => [] %} | term _args:* {% ([a,args]) => [a].concat(args) %}
 _args -> %COMMA term {% ([,t]) => t %}
 
+qid -> %ID _qid:* {% ([a,args]) => [a.value].concat(args).join('.') %}
+_qid -> %DOT %ID {% ([,t]) => t.value %}
+
 sterm ->
     %STAR                       {% () => Star() %}
   | %TYPE                       {% () => Typ()  %}
+  | %KIND                       {% () => Knd()  %}
   | %ID %LEFTSQU args %RIGHTSQU {% ([id,,args]) => MVar(id.value,args) %}
   | %ID                         {% ([id]) => PreScope(id.value) %}
-  | %LEFTPAR term %RIGHTPAR     {% ([,t,]) => t.value %}
+  | %QID                        {% ([id]) => PreRef(id.value) %}
+  | %LEFTPAR term %RIGHTPAR     {% ([,t,]) => t %}
 
 aterm -> sterm sterm:* {% ([te,ts]) => app(te,ts) %}
 

@@ -19,18 +19,21 @@
 
 
 <div class="container">
-  <button class="" onclick="check_all_instructions();">Type Check !</button>
+  <button class="" onclick="process_all_instructions();">Type Check !</button>
   <div class="row align-items-start">
     <div class="col mx-3">
       <h1>Code</h1>
       <div class="form-outline mx-3">
-<textarea class="form-control" id="code" rows="8">
+<textarea class="form-control" id="code" rows="30">
+#REQUIRE test;
 A : Type;
 f : (x:A) -> A := x => x; // Commentaire
 #PRINT A;
 // Test
 
 : x => X[a,A,x] --> X;
+#EVAL (x=>x) (y=>y) (z=>A);
+#CHECK A : Type;
 </textarea>
       </div>
     </div>
@@ -56,7 +59,12 @@ function clear_logs() { logs.innerHTML = ""; }
 function log_ok(title,msg)   { log(title,msg,['alert','alert-success']); }
 function log_info(title,msg) { log(title,msg,['alert','alert-info']); }
 function log_warn(title,msg) { log(title,msg,['alert','alert-warning']); }
-function log_err(title,msg)  { log('ERROR: '+title,msg,['alert','alert-danger']); }
+function log_err(err)  {
+  const msg = err.message || err;
+  const i = msg && msg.indexOf(':');
+  if (i >= 0) { log('ERROR: '+msg.slice(0,i), msg.slice(i+1), ['alert','alert-danger']); }
+  else        { log('ERROR'                 , err           , ['alert','alert-danger']); }
+}
 function log(title,msg,classes=[]) {
   const div = document.createElement('div');
   div.style['white-space']= 'pre-wrap';
@@ -82,13 +90,15 @@ function scope(e, env, ctx=Ctx()) {
   switch (e[c]) {
     // Variable, meta-variable or symbol to scope
     case "PreScope":
-      let i = index_of(ctx,e.name);
-      if (i != null) { return Var (i, preferred_name=e.name); }
-      let s = get(env,e.name);
+      const ind = index_of(ctx,e.name);
+      if (ind != null) { return Var(ind, preferred_name=e.name); }
+      const s = get(env,e.name);
       if (s) { return Ref(s.fullname); }
       return MVar(e.name,[])
     // (Meta-)term constructors
       break;
+    case "PreRef": // Reference to check
+      return Ref(do_get(env,e.name).fullname);
     case "All":
       e.dom = scope(e.dom, env, ctx);
       e.cod = scope(e.cod, env, extend(ctx, [e.name,null]));
@@ -129,33 +139,17 @@ function scope(e, env, ctx=Ctx()) {
 
 // Pretty prints a context
 function show_context(ctx, i = 0) {
-  var bind = get_bind(ctx, i);
-  if (bind) {
-    var term = " : " + (bind[1] ? show(norm(bind[1], {}, true), ctx) : "?");
-    return show_context(ctx, i + 1) + bind[0] + term + "\n";
-  } else {
-    return "";
-  }
+  const bind = get_bind(ctx, i);
+  if (!bind) { return ""; }
+  const term = " : " + (bind[1] ? show(nf(bind[1],{}), ctx) : "?");
+  return show_context(ctx, i+1) + bind[0] + term + "\n";
 }
 
 // Converts a term to a string
 function show(term, ctx = Ctx()) {
   switch (term[c]) {
-    case "Var":
-      return get_name(ctx, term.index) || "#" + term.index;
-    case "Typ":
-      return "Type";
-    case "All":
-      let dom = show(term.dom, extend(ctx, [term.name, null]));
-      let cod = show(term.cod, extend(ctx, [term.name, null]));
-      return "(" + term.name + " : " + dom + ") -> " + cod;
-    case "Lam":
-      let body = show(term.body, extend(ctx, [term.name, null]));
-      if (term.bind) {
-        return "(" + term.name + " : " + show(term.bind, extend(ctx, [term.name, null])) + ") => " + body;
-      } else {
-        return term.name + " => " + body;
-      }
+    case "Typ": return "Type";
+    case "Var": return get_name(ctx, term.index) || "#" + term.index;
     case "App":
       let text = ")";
       let vterm = term;
@@ -164,223 +158,186 @@ function show(term, ctx = Ctx()) {
         vterm = vterm.func;
       }
       return "(" + show(vterm, ctx) + text;
-    case "Ref":
-      return term.name;
-    case "PreScope":
-      return '?'+term.name;
-    case "Star":
-      return '*';
-    case "MVar":
-      console.log(term);
-      return term.name+"["+term.args.map((x)=>show(x,ctx)).join(',')+"]";
+    case "All":
+      let dom = show(term.dom,ctx);
+      let cod = show(term.cod,extend(ctx, [term.name, null]));
+      return (term.name ? "("+term.name+" : "+dom+")" : dom) + " -> "+cod;
+    case "Lam":
+      let body = show(term.body, extend(ctx, [term.name, null]));
+      return (term.type ? "("+term.name+" : "+show(term.type,ctx)+")" : term.name)+" => "+body;
+    case "PreScope": return '?'+term.name;
+    case "Ref": return term.name;
+    case "Star": return '*';
+    case "MVar": return term.name+"["+term.args.map((x)=>show(x,ctx)).join(',')+"]";
   }
 }
 
 // Shifts a term
-function shift(term, inc, depth) {
+function shift(term, inc=1, depth=0) {
   switch (term[c]) {
+    case "Typ": return Typ();
+    case "Star": return Star();
     case "Var":
       return Var(term.index < depth ? term.index : term.index + inc);
-    case "Typ":
-      return Typ();
-    case "All":
-      var name = term.name;
-      var bind = shift(term.bind, inc, depth + 1);
-      var body = shift(term.body, inc, depth + 1);
-      return All(name, bind, body);
-    case "Lam":
-      var name = term.name;
-      var bind = term.bind && shift(term.bind, inc, depth + 1);
-      var body =              shift(term.body, inc, depth + 1);
-      return Lam(name, bind, body);
-    case "App":
-      var func = shift(term.func, inc, depth);
-      var argm = shift(term.argm, inc, depth);
-      return App(func, argm);
     case "Ref":
       return Ref(term.name);
+    case "All":
+      const dom = shift(term.dom,inc,depth+1);
+      const cod = shift(term.cod,inc,depth  );
+      return All(term.name,dom,cod);
+    case "Lam":
+      const type = term.type && shift(term.type, inc, depth  );
+      const body =              shift(term.body, inc, depth+1);
+      return Lam(term.name, type, body);
+    case "App":
+      return App(shift(term.func, inc, depth), shift(term.argm, inc, depth));
+    case "MVar":
+      return MVar(term.name,term.args.map((t)=>shift(t, inc, depth)));
+    default:
+      throw "Shift:\nUnexpected constructor:"+term[c];
   }
+}
+
+// Check that a and b have compatible head. Stacks conversion-relevant subterms in t.
+function same_head(a,b,t) {
+  if (a[c] !== b[c]) { return false; }
+  switch (a[c]) {
+    case "Var":
+      if (a.index !== b.index) { return false; }
+      break;
+    case "Ref":
+      if (a.name !== b.name) { return false; }
+      break;
+    case "All":
+      t.push({a:a.dom,b:b.dom});
+      t.push({a:a.cod,b:b.cod});
+      break;
+    case "Lam":
+      t.push({a:a.body,b:b.body});
+      break;
+    case "App":
+      t.push({a:a.func,b:b.func});
+      t.push({a:a.argm,b:b.argm});
+      break;
+    case "MVar":
+      if (a.name !== b.name || a.args.length !== b.args.length) { return false; }
+      for (let i = 0; i < a.args.length; i++) {
+        t.push({a:a.args[i],b:b.args[i]});
+      }
+      break;
+    case "Typ":
+    case "Knd":
+    case "Star": break;
+    default: throw "Equals:\nUnexpected constructor: "+term[c];
+  }
+  return true;
+}
+
+function equals(a, b) {
+  let t = [ {a,b} ];
+  while (t.length > 0) {
+    const {a,b} = t.pop();
+    if (a === b) { continue; }
+    if (!same_head(a,b,t)) { return false; }
+  }
+  return true;
 }
 
 // Checks if two terms are equal
-function equals(a, b, env) {
-  function Eql(a, b)    { return ["Eql", {a, b}]; }
-  function Bop(v, x, y) { return ["Bop", {v, x, y}]; }
-  function Val(v)       { return ["Val", {v}]; }
-
-  function step(node) {
-    switch (node[0]) {
-      // An equality test
-      case "Eql":
-        var {a, b} = node[1];
-
-        // Gets whnfs with and without dereferencing
-        var ax = norm(a, {}, false);
-        var bx = norm(b, {}, false);
-        var ay = norm(a, env, false);
-        var by = norm(b, env, false);
-
-        // Optional optimization: if hashes are equal, then a == b
-        if (a[2] === b[2] || ax[2] === bx[2] || ay[2] === by[2]) {
-          return Val(true);
-        }
-
-        // If non-deref whnfs are app and fields are equal, then a == b
-        var x = null;
-        if (ax[2] !== ay[2] || bx[2] !== by[2]) {
-          if (ax[0] === "Ref" && bx[0] === "Ref" && ax[1].name === bx[1].name) {
-            x = Val(true);
-          } else if (ax[0] === "App" && bx[0] === "App") {
-            var func = Eql(ax[1].func, bx[1].func);
-            var argm = Eql(ax[1].argm, bx[1].argm);
-            x = Bop(false, func, argm);
-          }
-        }
-
-        // If whnfs are equal and fields are equal, then a == b
-        var y = null;
-        if (ay[0] === "Typ" && by[0] === "Typ") {
-          y = Val(true);
-        } else if (ay[0] === "All" && by[0] === "All") {
-          y = Bop(false, Eql(ay[1].bind, by[1].bind), Eql(ay[1].body, by[1].body));
-        } else if (ay[0] === "Lam" && by[0] === "Lam") {
-          y = Eql(ay[1].body, by[1].body)
-        } else if (ay[0] === "App" && by[0] === "App") {
-          y = Bop(false, Eql(ay[1].func, by[1].func), Eql(ay[1].argm, by[1].argm));
-        } else if (ay[0] === "Var" && by[0] === "Var") {
-          y = Val(ay[1].index === by[1].index);
-        } else {
-          y = Val(false);
-        }
-
-        return x ? Bop(true, x, y) : y;
-
-      // A binary operation (or / and)
-      case "Bop":
-        var {v, x, y} = node[1];
-        if (x[0] === "Val") {
-          return x[1].v === v ? Val(v) : y;
-        } else if (y[0] === "Val") {
-          return y[1].v === v ? Val(v) : x;
-        } else {
-          return Bop(v, step(x), step(y));
-        }
-
-      // A result value (true / false)
-      case "Val":
-        return node;
-    }
+function are_convertible(a, b, env) {
+  let t = [ {a,b} ];
+  while (t.length > 0) {
+    const {a,b} = t.pop();
+    if (equals(a,b)) { continue; }
+    if (!same_head( whnf(a,env) , whnf(b,env) ,t)) { return false; }
   }
-
-  // Expands the search tree until it finds an answer
-  let tree = Eql(a, b);
-  while (tree[c] !== "Val") { tree = step(tree); }
-  return tree.v;
+  return true;
 }
 
-// Reduces a term to normal form or head normal form
-function norm(term, defs, full) {
-  const cont = full ? norm : (x => x);
-  const apply = (func, argm) => {
-    var func = norm(func, defs, false);
-    if (func[c] === "Lam") {
-      return norm(subst(func.body, argm, 0), defs, full);
-    } else {
-      return App(cont(func, defs, false), cont(argm, defs, full));
-    }
-  }
-  const dereference = (name) => {
-    if (defs[name] && !defs[name].seen) {
-      return norm(defs[name].term, defs, full);
-    } else {
-      return Ref(name);
-    }
-  }
+// Reduces a term until a normal form is found
+function norm(term, env, rec) {
+  function cont(t) { return rec(t,env,rec) };
   switch (term[c]) {
     case "Var": return Var(term.index);
-    case "Typ": return Typ();
-    case "All": return All(term.name, cont(term.bind, defs, false), cont(term.body, defs, full));
-    case "Lam": return Lam(term.name, term.bind && cont(term.bind, defs, false), cont(term.body, defs, full)); 
-    case "App": return apply(term.func, term.argm);
-    case "Ref": return dereference(term.name);
+    case "Typ":
+    case "Knd":
+    case "Star": return term;
+    case "All": return All(term.name, cont(term.dom), cont(term.cod));
+    case "Lam": return Lam(term.name, term.type && cont(term.type), cont(term.body)); 
+    case "App":
+      const nfunc = cont(term.func);
+      if (nfunc[c] === "Lam") {
+        return cont(subst(nfunc.body, term.argm, 0), env);
+      } else {
+        return App(cont(nfunc), cont(term.argm));
+      }
+    case "Ref": return Ref(term.name);
+    case "MVar": return MVar(term.name, term.args.map(cont));
+    default: throw "Norm:\nUnexpected constructor to normalize:"+term[c];
   }
 }
+function whnf(term, env) { return norm(term, env, rec = (x)=>x ); }
+function   nf(term, env) { return norm(term, env, rec = norm   ); }
+
 
 // Substitution
-function subst(term, val, depth) {
+function subst(term, val, depth=0) {
   switch (term[c]) {
     case "Var":
       return depth === term.index ? val : Var(term.index - (term.index > depth ? 1 : 0));
     case "Typ":
       return Typ();
     case "All":
-      var name = term.name;
-      var bind = subst(term.bind, val && shift(val, 1, 0), depth + 1);
-      var body = subst(term.body, val && shift(val, 1, 0), depth + 1);
-      return All(name, bind, body);
+      const dom = subst(term.dom, val, depth);
+      const cod = subst(term.cod, val && shift(val), depth+1);
+      return All(term.name, dom, cod);
     case "Lam":
-      var name = term.name;
-      var bind = term.bind && subst(term.bind, val && shift(val, 1, 0), depth + 1);
-      var body =              subst(term.body, val && shift(val, 1, 0), depth + 1);
-      return Lam(name, bind, body);
+      const type = term.type && subst(term.type, val, depth);
+      const body =              subst(term.body, val && shift(val), depth+1);
+      return Lam(term.name, type, body);
     case "App":
-      var func = subst(term.func, val, depth);
-      var argm = subst(term.argm, val, depth);
+      const func = subst(term.func, val, depth);
+      const argm = subst(term.argm, val, depth);
       return App(func, argm);
     case "Ref":
-      var name = term.name;
-      return Ref(name);
+      return Ref(term.name);
   }
 }
 
 // Infers the type of a term
 function infer(term, env, ctx = Ctx()) {
   switch (term[c]) {
-    case "Typ":
-      return Typ();
+    case "Knd": throw "Infer:\nCannot infer the type of Kind !";
+    case "Typ": return Knd();
     case "All":
-      var ex_ctx = extend(ctx, [term.name, term.dom]);
-      let dom_t = infer(term.dom, env, ex_ctx);
-      var cod_t = infer(term.cod, env, ex_ctx);
-      if (!equals(dom_t, Typ(), env, ctx) || !equals(cod_t, Typ(), env, ctx)) {
-        throw "Infer\nForall not a type: `" + show(term, ctx) + "`.\n\n[CONTEXT]\n" + show_context(ctx);
+      const dom = infer(term.dom, env, ctx);
+      const cod = infer(term.cod, env, extend(ctx, [term.name, term.dom]));
+      if (!are_convertible(dom, Typ(), env)) {
+        throw "Infer:\nDomain of forall is not a type: `" + show(term, ctx) + "`.\n\n[CONTEXT]\n" + show_context(ctx);
       }
-      return Typ();
+      if (!are_convertible(cod, Typ(), env) && !are_convertible(cod, Knd(), env)) {
+        throw "Infer:\nCodomain of forall is neither a type nor a kind: `" + show(term, ctx) + "`.\n\n[CONTEXT]\n" + show_context(ctx);
+      }
+      return cod;
     case "Lam":
-      if (term.bind === null) {
+      if (term.type === null) {
         throw "Infer:\nCan't infer non-annotated lambda `"+show(term,ctx)+"`.\n\n[CONTEXT]\n" + show_context(ctx);
       } else {
-        var ex_ctx = extend(ctx, [term.name, term.bind]);
-        var body_t = infer(term.body, env, ex_ctx);
-        var term_t = All(term.name, term.bind, body_t);
+        const body_t = infer(term.body, env, extend(ctx, [term.name, term.type]));
+        const term_t = All(term.name, term.type, body_t);
         infer(term_t, env, ctx);
         return term_t;
       }
     case "App":
-      var func_t = norm(infer(term.func, env, ctx), env, false);
+      const func_t = whnf(infer(term.func, env, ctx), env);
       if (func_t[c] !== "All") {
         throw "Infer:\nNon-function application on `" + show(term, ctx) + "`.\n\n[CONTEXT]\n" + show_context(ctx);
       }
-      var bind_t = subst(func_t.bind, term.argm, 0);
-      var argm_v = check(term.argm, bind_t, env, ctx, () => "`" + show(term, ctx) + "`'s argument");
-      return subst(func_t.body, argm_v, 0);
+      const dom_t = subst(func_t.dom, term.argm);
+      const argm_v = check(term.argm, dom_t, env, ctx, () => "`" + show(term, ctx) + "`'s argument");
+      return subst(func_t.cod, argm_v);
     case "Ref":
-      let def = get(env,term.name);
-      if (def) {
-        if (def.done) {
-          return def.type;
-        } else {
-          def.done = true;
-          if (def.type) {
-            check(def.term, def.type, env, ctx, () => "`" + term.name + "`'s annotated type");
-          } else {
-            def.type = infer(def.term, env, ctx);
-          }
-          return def.type;
-        }
-      } else {
-        throw "Infer:\nUndefined reference: `" + term.name + "`.";
-      }
+      return do_get(env,term.name).type;
     case "Var":
       return get_term(ctx, term.index);
   }
@@ -389,27 +346,27 @@ function infer(term, env, ctx = Ctx()) {
 // Checks if a term has given type
 function check(term, type, env, ctx = Ctx(), expr) {
   var expr = expr || (() => show(term, ctx));
-  var type = norm(type, env, false);
-  if (type[c] === "All" && term[c] === "Lam" && !term.bind) {
+  var type = whnf(type, env);
+  if (type[c] === "All" && term[c] === "Lam" && !term.type) {
     infer(type, env, ctx);
-    const ex_ctx = extend(ctx, [type[1].name, type[1].bind]);
-    const body_v = check(term[1].body, type[1].body, env, ex_ctx, () => "`" + show(term, ctx) + "`'s body");
-    return Lam(type[1].name, type[1].bind, body_v);
+    const ex_ctx = extend(ctx, [type.name, type.dom]);
+    const body_v = check(term.body, type.cod, env, ex_ctx, () => "`" + show(term, ctx) + "`'s body");
+    return Lam(type.name, type.dom, body_v);
   } else {
     const term_t = infer(term, env, ctx);
     let checks = false;
     try {
-      checks = equals(type, term_t, env, ctx);
+      checks = are_convertible(type, term_t, env);
     } catch (e) {
       console.log("Couldn't decide if terms are equal.");
       console.log(e);
     }
     if (!checks) {
-      throw "Check:"                                       +"\n"+
-        "Type mismatch on " + expr() + "."                 +"\n"+
-        "- Expect = " + show(norm(type  , env, true ), ctx)+"\n"+
-        "- Actual = " + show(norm(term_t, env, false), ctx)+"\n"+
-        "[CONTEXT]"                                        +"\n"+
+      throw "Check:"                               +"\n"+
+        "Type mismatch on " + expr() + "."         +"\n"+
+        "- Expect = " + show(  nf(type  ,env), ctx)+"\n"+
+        "- Actual = " + show(whnf(term_t,env), ctx)+"\n"+
+        "[CONTEXT]"                                +"\n"+
         show_context(ctx);
     }
     return term;
@@ -423,20 +380,12 @@ function check_rule(env, lhs, rhs) {
   // TODO
 }
 
-function check_instruction(instruction, env) {
-  let ins;
-  try {
-    ins = scope(instruction,env);
-  } catch (err) {
-    log_err("rule",err);
-  }
+function process_instruction(instruction, env) {
+  let ins = scope(instruction,env);
   switch (ins[c]) {
-  case "Print":
-    log_info("Show",show(ins.term));
-    break;
   case "Decl":
-    log_ok("Symbol declared",ins.name+" with type " +show(ins.type) );
     add_new_symbol(env,ins.name,ins.type);
+    log_ok("Symbol declared",ins.name+" with type " +show(ins.type) );
     break;
   case "Def":
     log_ok("Symbol defined",
@@ -448,25 +397,43 @@ function check_instruction(instruction, env) {
       check_rule(env,ins.lhs,ins.rhs);
       log_ok("Rewrite rule added",show(ins.lhs)+ " --\> " + show(ins.rhs));
     break;
+  case "Req":
+    break;
+  case "Eval":
+    log_info("Eval",show(nf(ins.term)));
+    
+    break;
+  case "Infer":
+    log_info("Infer",show(infer(ins.term,env)));
+    break;
+  case "Check":
+    check(ins.term,ins.type,env);
+    log_ok("Check",show(ins.term)+" has indeed type "+show(ins.type));
+    break;
+  case "Print":
+    log_info("Show",show(ins.term));
+    break;
+  default:
+    throw "Instruction:\nUnexepected instruction type:"+ins[c];
   }
 }
 
+var env;
+
+// Main processing loop
 var code, instructions;
-function check_all_instructions() {
+function process_all_instructions() {
   clear_logs();
   try {
+    // Parsing of raw text code
     code = document.getElementById("code").value;
     instructions = parse( code );
     log_ok("Parsing","done.");
-    let env = Env();
-    instructions.forEach((ins)=>check_instruction(ins,env));
-    log_ok("All done !");
-  } catch(err) {
-    const i = err.message.indexOf(':');
-    if (i<0) { throw err; }
-    log_err(err.message.slice(0,i),err.message.slice(i+1));
-    return;
-  }
+    // Reseting the environnement
+    env = Env();
+    instructions.forEach((ins)=>process_instruction(ins,env));
+    log_ok("All done !","");
+  } catch(e) { log_err(e); throw e; }
 }
 
 </script>
