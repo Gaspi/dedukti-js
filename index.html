@@ -26,12 +26,18 @@
       <div class="form-outline mx-3">
 <textarea class="form-control" id="code" rows="30">
 #REQUIRE test;
-A : Type;
-f : (x:A) -> A := x => x; // Commentaire
-#PRINT A;
-// Test
 
+// Declarations
+A : Type;
+a : A;
+f : (x:A) -> A := x => x; 
+
+// Rewrite rule
 : x => X[a,A,x] --> X;
+
+// Basic commands
+#PRINT A;
+#INFER x:A => A;
 #EVAL (x=>x) (y=>y) (z=>A);
 #CHECK A : Type;
 </textarea>
@@ -69,6 +75,8 @@ function log(title,msg,classes=[]) {
   const div = document.createElement('div');
   div.style['white-space']= 'pre-wrap';
   div.innerHTML = '<strong>['+title+']</strong> '+msg;
+  div.classList.add('p-1');
+  div.classList.add('m-2');
   classes.forEach((x)=>div.classList.add(x));
   logs.appendChild(div);
 }
@@ -148,6 +156,7 @@ function show_context(ctx, i = 0) {
 // Converts a term to a string
 function show(term, ctx = Ctx()) {
   switch (term[c]) {
+    case "Knd": return "Kind";
     case "Typ": return "Type";
     case "Var": return get_name(ctx, term.index) || "#" + term.index;
     case "App":

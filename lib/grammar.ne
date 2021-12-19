@@ -87,8 +87,9 @@ term ->
     aterm                                           {% ([t]) => t %}
   | %ID %COLON aterm %ARROW term                    {% ([ id,,dom, ,cod]) => All(id.value,dom,cod) %}
   | %LEFTPAR %ID %COLON aterm %RIGHTPAR %ARROW term {% ([,id,,dom,,,cod]) => All(id.value,dom,cod) %}
-  | aterm %ARROW term                               {% ([    dom, ,cod])    => All(null,dom,cod) %}
+  | aterm %ARROW term                               {% ([    dom, ,cod])  => All(null,dom,cod) %}
   | %ID %FATARROW term                              {% ([id,,body])       => Lam(id.value,Star(),body) %}
   | %ID %COLON aterm %FATARROW term                 {% ([id,,type,,body]) => Lam(id.value,type,body) %}
+  | %LEFTPAR %ID %COLON aterm %RIGHTPAR %FATARROW term {% ([,id,,type,,,body]) => Lam(id.value,type,body) %}
   | %LEFTPAR %ID %COLON aterm %DEF aterm %RIGHTPAR %FATARROW term
     {% ([,id,,type,,val,,,body]) => App(Lam(id.value,type,body), val) %}
