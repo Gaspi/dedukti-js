@@ -33,7 +33,7 @@ a : A;
 f : (x:A) -> A := x => x; 
 
 // Rewrite rule
-: x => X[a,A,x] --> X;
+: f a --> X;
 
 // Basic commands
 #PRINT A;
@@ -54,6 +54,7 @@ f : (x:A) -> A := x => x;
 <script src="lib/term.js"></script>
 <script src="lib/context.js"></script>
 <script src="lib/env.js"></script>
+<script src="lib/red.js"></script>
 <script src="moo/moo.js"></script>
 <script src="lib/grammar.js"></script>
 <script src="nearley/lib/nearley.js"></script>
@@ -274,9 +275,9 @@ function norm(term, env, rec) {
     case "All": return All(term.name, cont(term.dom), cont(term.cod));
     case "Lam": return Lam(term.name, term.type && cont(term.type), cont(term.body)); 
     case "App":
-      const nfunc = cont(term.func);
+      const nfunc = norm(term.func, env, rec);
       if (nfunc[c] === "Lam") {
-        return cont(subst(nfunc.body, term.argm, 0), env);
+        return cont(subst(nfunc.body, term.argm), env);
       } else {
         return App(cont(nfunc), cont(term.argm));
       }
@@ -285,11 +286,11 @@ function norm(term, env, rec) {
     default: throw "Norm:\nUnexpected constructor to normalize:"+term[c];
   }
 }
-function whnf(term, env) { return norm(term, env, rec = (x)=>x ); }
-function   nf(term, env) { return norm(term, env, rec = norm   ); }
+function whnf(term, env) { return norm(term, env, rec = (x) => x ); }
+function   nf(term, env) { return norm(term, env, rec = norm     ); }
 
 
-// Substitution
+// Variable substitution
 function subst(term, val, depth=0) {
   switch (term[c]) {
     case "Var":
@@ -312,6 +313,13 @@ function subst(term, val, depth=0) {
       return Ref(term.name);
   }
 }
+
+// Meta-variables substitution
+function meta_subst(term, name, val) {
+  
+}
+
+
 
 // Infers the type of a term
 function infer(term, env, ctx = Ctx()) {
@@ -363,54 +371,59 @@ function check(term, type, env, ctx = Ctx(), expr) {
     return Lam(type.name, type.dom, body_v);
   } else {
     const term_t = infer(term, env, ctx);
-    let checks = false;
-    try {
-      checks = are_convertible(type, term_t, env);
-    } catch (e) {
-      console.log("Couldn't decide if terms are equal.");
-      console.log(e);
-    }
-    if (!checks) {
-      throw "Check:"                               +"\n"+
-        "Type mismatch on " + expr() + "."         +"\n"+
-        "- Expect = " + show(  nf(type  ,env), ctx)+"\n"+
-        "- Actual = " + show(whnf(term_t,env), ctx)+"\n"+
-        "[CONTEXT]"                                +"\n"+
+    if (!are_convertible(type, term_t, env)) {
+      throw "Check:"                     +"\n"+
+        "Type mismatch on " + expr()+"." +"\n"+
+        "- Expect = " + show(type  , ctx)+"\n"+
+        "- Actual = " + show(term_t, ctx)+"\n"+
+        "[CONTEXT]"                      +"\n"+
         show_context(ctx);
     }
     return term;
   }
 }
 
-
-function add_env_rule(env, qualname, rule) { get(env,qualname).rules.push(rule); }
-
-function check_rule(env, lhs, rhs) {
+function check_rule_type_preserving(env,rule) {
   // TODO
 }
 
-function process_instruction(instruction, env) {
+// Checks declared type and adds a new symbol to the environment
+function declare_symbol(env,ins) {
+  const sort = infer(ins.type, env);
+  if (!are_convertible(sort,Typ(),env) && !are_convertible(sort,Knd(),env)) {
+    throw "Declaration:\nDeclared type is not a sort.: `" + show(ins.type) + "`.";
+  }
+  add_new_symbol(env,ins.name,ins.type);
+  log_ok("Symbol declared",ins.name+" with type " +show(ins.type) );
+}
+
+// Checks type preservation and add a new rule to the reduction machine
+function declare_rule(env,red,rule) {
+  check_rule_type_preserving(env,rule);
+  add_new_rule(red,rule);
+  log_ok("Rewrite rule added",show(rule.lhs)+ " --\> " + show(rule.rhs));
+}
+
+// Processes a single instruction
+function process_instruction(instruction,env,red) {
   let ins = scope(instruction,env);
   switch (ins[c]) {
   case "Decl":
-    add_new_symbol(env,ins.name,ins.type);
-    log_ok("Symbol declared",ins.name+" with type " +show(ins.type) );
+    declare_symbol(env,ins);
     break;
   case "Def":
-    log_ok("Symbol defined",
-      (ins.name || 'unnamed')+
-      " with type " + (ins.type ? show(ins.type) : 'undefined')+
-      " and definition "+(ins.def ? show(ins.def) : 'undefined'));
+    declare_symbol(env,ins);
+    const rule = Rew(Ref(ins.name),ins.def,ins.name+"_def");
+    console.log(rule);
+    declare_rule(env,red, rule);
     break;
   case "Rew":
-      check_rule(env,ins.lhs,ins.rhs);
-      log_ok("Rewrite rule added",show(ins.lhs)+ " --\> " + show(ins.rhs));
+    declare_rule(env,red,ins);
     break;
   case "Req":
     break;
   case "Eval":
     log_info("Eval",show(nf(ins.term)));
-    
     break;
   case "Infer":
     log_info("Infer",show(infer(ins.term,env)));
@@ -427,10 +440,11 @@ function process_instruction(instruction, env) {
   }
 }
 
-var env;
+// Global variables for easy access
+var code, instructions, env ,red;
+var debug = true;
 
 // Main processing loop
-var code, instructions;
 function process_all_instructions() {
   clear_logs();
   try {
@@ -440,9 +454,13 @@ function process_all_instructions() {
     log_ok("Parsing","done.");
     // Reseting the environnement
     env = Env();
-    instructions.forEach((ins)=>process_instruction(ins,env));
+    red = Red();
+    instructions.forEach((ins)=>process_instruction(ins,env,red));
     log_ok("All done !","");
-  } catch(e) { log_err(e); throw e; }
+  } catch(e) {
+    log_err(e);
+    if (debug) { throw e; }
+  }
 }
 
 </script>
