@@ -77,8 +77,12 @@ function log_warn(title,msg) { log(title,msg,['alert','alert-warning']); }
 function log_err(err)  {
   const msg = err.message || err;
   const i = msg && msg.indexOf(':');
-  if (i >= 0) { log('ERROR: '+msg.slice(0,i), msg.slice(i+1), ['alert','alert-danger']); }
-  else        { log('ERROR'                 , err           , ['alert','alert-danger']); }
+  if (msg.startsWith("Syntax error ")) {
+    log('SYNTAX ERROR: '+msg.slice(13,i), msg.slice(i+1), ['alert','alert-danger']);
+  } else {
+    if (i >= 0) { log('ERROR: '+msg.slice(0,i), msg.slice(i+1), ['alert','alert-danger']); }
+    else        { log('ERROR'                 , err           , ['alert','alert-danger']); }
+  }
 }
 function log(title,msg,classes=[]) {
   const div = document.createElement('div');
@@ -101,8 +105,16 @@ function parse(code) {
   return parser.results[0];
 }
 
+function scope_instruction(ins, env) {
+  if (ins.term) { ins.term = scope(ins.term, env); }
+  if (ins.type) { ins.type = scope(ins.type, env); }
+  if (ins.def ) { ins.def  = scope(ins.def , env); }
+  if (ins.lhs ) { ins.lhs  = scope(ins.lhs , env); }
+  if (ins.rhs ) { ins.rhs  = scope(ins.rhs , env); }
+}
+
 // In place scoping of (meta-)term and instructions
-function scope(e, env, ctx=Ctx()) {
+function scope(e, env, ctx=Ctx(), mvars) {
   if (!e) { return e; }
   switch (e[c]) {
     // Variable, meta-variable or symbol to scope
@@ -111,7 +123,8 @@ function scope(e, env, ctx=Ctx()) {
       if (ind != null) { return Var(ind, preferred_name=e.name); }
       const s = get(env,e.name);
       if (s) { return Ref(s.fullname); }
-      return MVar(e.name,[])
+      mvars.push(e.name);
+      return MVar(e.name,[]);
     // (Meta-)term constructors
       break;
     case "PreRef": // Reference to check
@@ -130,25 +143,8 @@ function scope(e, env, ctx=Ctx()) {
       break;
     case "MVar":
       for (let i = 0; i < e.args.length; i++) {
-        e.args[i] = scope(e.args[i], env,ctx);
+        e.args[i] = scope(e.args[i],env,ctx);
       }
-      break;
-    // Instruction constructors
-    case "Check":
-      e.type = scope(e.type, env,ctx);
-    case "Eval":
-    case "Infer":
-    case "Print":
-      e.term = scope(e.term, env,ctx);
-      break;
-    case "Def":
-      e.def = scope(e.def, env,ctx);
-    case "Decl":
-      e.type = scope(e.type, env,ctx);
-      break;
-    case "Rew":
-      e.lhs = scope(e.lhs, env,ctx);
-      e.rhs = scope(e.rhs, env,ctx);
       break;
   }
   return e;
@@ -186,7 +182,11 @@ function pp_term(term, ctx = Ctx()) {
       return (term.name ? "("+term.name+" : "+dom+")" : dom) + " -> "+cod;
     case "Lam":
       let body = pp_term(term.body, extend(ctx, [term.name, null]));
-      return (term.type ? "("+term.name+" : "+pp_term(term.type,ctx)+")" : term.name)+" => "+body;
+      if (term.type && term.type[c] != 'Star') {
+        return "("+term.name+" : "+pp_term(term.type,ctx)+") => "+body;
+      } else {
+        return term.name + " => "+body;
+      }
     case "PreScope": return '?'+term.name;
     case "Ref": return term.name;
     case "Star": return '*';
@@ -194,7 +194,7 @@ function pp_term(term, ctx = Ctx()) {
   }
 }
 
-// Shifts a term
+// Shifts variables deeper than [depth] by [inc] in the term [term]
 function shift(term, inc=1, depth=0) {
   switch (term[c]) {
     case "Typ": return Typ();
@@ -276,13 +276,13 @@ function are_convertible(u, v, red) {
   return true;
 }
 
-// Variable substitution
+// Substitutes [val] for variable with DeBruijn index [depth]
+// and downshifts all variables referencing beyond that index:
+// subst(  y#0 \x.(x#0 y#1 z#2) , v#9 )  :=  v#8 \x.(x#0 v#9 z#1)
 function subst(term, val, depth=0) {
   switch (term[c]) {
     case "Var":
       return depth === term.index ? val : Var(term.index - (term.index > depth ? 1 : 0));
-    case "Typ":
-      return Typ();
     case "All":
       const dom = subst(term.dom, val, depth);
       const cod = subst(term.cod, val && shift(val), depth+1);
@@ -295,16 +295,39 @@ function subst(term, val, depth=0) {
       const func = subst(term.func, val, depth);
       const argm = subst(term.argm, val, depth);
       return App(func, argm);
-    case "Ref":
-      return Ref(term.name);
+    case "MVar":
+      const args = term.args.map( (t)=>subst(t,val,depth) );
+      return MVar(term.name, args);
+    default:
+      return term;
   }
 }
 
 // Meta-variables substitution
-function meta_subst(term, name, val) {
-  
+function meta_subst(term, map, depth=0) {
+  switch (term[c]) {
+    case "All":
+      const dom = meta_subst(term.dom, map, depth);
+      const cod = meta_subst(term.cod, map, depth+1);
+      return All(term.name, dom, cod);
+    case "Lam":
+      const type = term.type && meta_subst(term.type, map, depth);
+      const body =              meta_subst(term.body, map, depth+1);
+      return Lam(term.name, type, body);
+    case "App":
+      const func = meta_subst(term.func, map, depth);
+      const argm = meta_subst(term.argm, map, depth);
+      return App(func, argm);
+    case "MVar":
+      const args = term.args.map( (t) => meta_subst(t,map,depth) );
+      const s = map[term.name];
+      console.log(s);
+      if (!s) { return MVar(term.name, args); }
+      else { return meta_subst(s, args); }
+    default:
+      return term;
+  }
 }
-
 
 
 // Infers the type of a term
@@ -393,8 +416,8 @@ function declare_rule(env,red,rule) {
 }
 
 // Processes a single instruction
-function process_instruction(instruction, env, red) {
-  let ins = scope(instruction,env);
+function process_instruction(ins, env, red) {
+  scope_instruction(ins, env);
   switch (ins[c]) {
   case "Decl":
     declare_symbol(env, red, ins);
@@ -402,10 +425,10 @@ function process_instruction(instruction, env, red) {
   case "Def":
     declare_symbol(env, red, ins);
     const rule = Rew(Ref(ins.name),ins.def,ins.name+"_def");
-    declare_rule(env,red, rule);
+    declare_rule(env, red, rule);
     break;
   case "Rew":
-    declare_rule(env,red,ins);
+    declare_rule(env, red, ins);
     break;
   case "Req":
     break;
@@ -413,10 +436,10 @@ function process_instruction(instruction, env, red) {
     log_info("Eval",pp_term(nf(ins.term, red)));
     break;
   case "Infer":
-    log_info("Infer",pp_term(infer(ins.term,env,red)));
+    log_info("Infer",pp_term(infer(ins.term, env, red)));
     break;
   case "Check":
-    check(ins.term,ins.type,env,red);
+    check(ins.term, ins.type, env, red);
     log_ok("Check",pp_term(ins.term)+" has indeed type "+pp_term(ins.type));
     break;
   case "Print":
@@ -434,7 +457,7 @@ var debug = true;
 // Main processing loop
 function process_all_instructions() {
   clear_logs();
-  //try {
+  try {
     // Parsing of raw text code
     code = document.getElementById("code").value;
     instructions = parse( code );
@@ -444,10 +467,10 @@ function process_all_instructions() {
     red = Red();
     instructions.forEach((ins)=>process_instruction(ins,env,red));
     log_ok("All done !","");
-  //} catch(e) {
-  //  log_err(e);
-  //  if (debug) { throw e; }
-  //}
+  } catch(e) {
+    log_err(e);
+    if (debug) { throw e; }
+  }
 }
 
 </script>
