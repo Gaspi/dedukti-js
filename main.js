@@ -131,53 +131,68 @@ function are_convertible(u, v, red) {
 // and downshifts all variables referencing beyond that index:
 // subst(  y#0 \x.(x#0 y#1 z#2) , v#9 )  :=  v#8 \x.(x#0 v#9 z#1)
 function subst(term, val, depth=0) {
-  switch (term[c]) {
-    case "Var":
-      return depth === term.index ? val : Var(term.index - (term.index > depth ? 1 : 0));
-    case "All":
-      const dom = subst(term.dom, val, depth);
-      const cod = subst(term.cod, val && shift(val), depth+1);
-      return All(term.name, dom, cod);
-    case "Lam":
-      const type = term.type && subst(term.type, val, depth);
-      const body =              subst(term.body, val && shift(val), depth+1);
-      return Lam(term.name, type, body);
-    case "App":
-      const func = subst(term.func, val, depth);
-      const argm = subst(term.argm, val, depth);
-      return App(func, argm);
-    case "MVar":
-      const args = term.args.map( (t)=>subst(t,val,depth) );
-      return MVar(term.name, args);
-    default:
-      return term;
+  // Shifts memoisation
+  const shifts = [val];
+  function s(t,d) {
+    switch (t[c]) {
+      case "Var":
+        if (t.index != d) {
+          return Var(t.index - (t.index > d ? 1 : 0));
+        } else {
+          if (!shifts[d]) { shifts[d] = shift(val,inc=d); }
+          return shifts[d];
+        }
+      case "All" : return All(t.name, s(t.dom,d) , s(t.cod,d+1) );
+      case "Lam" : return Lam(t.name, t.type && s(t.type,d) , s(t.body,d+1) );
+      case "App" : return App( s(t.func,d) , s(t.argm,d) );
+      case "MVar": return MVar(t.name, t.args.map((t)=>s(t,d)) );
+      default: return t;
+    }
   }
+  return s(term,depth);
+}
+
+// Matches all variables to the corresponding meta variable
+function meta_match(term, map, depth) {
+  function mm(t,d) {
+    switch (t[c]) {
+      case "Var":
+        if (t.index >= d + depth) { return t; }
+        const m = map[t.index -d];
+        if (!m) { throw {[c]: 'MetaMatchFailed'}; }
+        else { return  m; }
+      case "All" : return All(t.name, mm(t.dom,d), mm(t.cod,d+1));
+      case "Lam" : return Lam(t.name, t.type && mm(t.type,d) , mm(t.body,d+1) );
+      case "App" : return App( mm(t.func,d) , mm(t.argm,d) );
+      case "MVar": return MVar(t.name, t.args.map( (t)=>mm(t,d) ));
+      default: return t;
+    }
+  }
+  return mm(term,0);
 }
 
 // Meta-variables substitution
-function meta_subst(term, map, depth=0) {
-  switch (term[c]) {
-    case "All":
-      const dom = meta_subst(term.dom, map, depth);
-      const cod = meta_subst(term.cod, map, depth+1);
-      return All(term.name, dom, cod);
-    case "Lam":
-      const type = term.type && meta_subst(term.type, map, depth);
-      const body =              meta_subst(term.body, map, depth+1);
-      return Lam(term.name, type, body);
-    case "App":
-      const func = meta_subst(term.func, map, depth);
-      const argm = meta_subst(term.argm, map, depth);
-      return App(func, argm);
-    case "MVar":
-      const args = term.args.map( (t) => meta_subst(t,map,depth) );
-      const s = map[term.name];
-      console.log(s);
-      if (!s) { return MVar(term.name, args); }
-      else { return meta_subst(s, args); }
-    default:
-      return term;
+// The map is an object whose keys are meta-variable names
+// and values are arrays of shifted terms to substitute
+function meta_subst(term, map) {
+  function ms(t,d) {
+    console.log(t,d);
+    switch (t[c]) {
+      case "MVar":
+        const args = t.args.map((t)=>ms(t,d));
+        const s = map[t.name];
+        console.log(s);
+        if (!s) { return MVar(t.name,args); }
+        if (!s[d]) { s[d] = shift(s[0],d);
+        console.log(s[0], s[d]);
+        return meta_subst(s[d], args.map((t)=>[t])); }
+      case "All" : return All(t.name, ms(t.dom,d) , ms(t.cod,d+1) );
+      case "Lam" : return Lam(t.name, t.type && ms(t.type,d) , ms(t.body,d+1) );
+      case "App" : return App( ms(t.func,d) , ms(t.argm,d) );
+      default: return t;
+    }
   }
+  return ms(term,0);
 }
 
 

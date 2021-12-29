@@ -42,6 +42,7 @@ f : T -> T := x => x;
 g : t:T -> a:A t -> B t a;
 : g X a --> X;
 : g * (x=>X[x]) --> X[a];
+#EVAL g a a;
 
 // Basic commands
 #PRINT A;
