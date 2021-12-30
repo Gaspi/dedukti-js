@@ -152,44 +152,17 @@ function subst(term, val, depth=0) {
   return s(term,depth);
 }
 
-// Matches all variables to the corresponding meta variable
-function meta_match(term, map, depth) {
-  console.log("MetaMatch: ",term,map,depth);
-  function mm(t,d) {
-    switch (t[c]) {
-      case "Var":
-      console.log("MM:",t,d,depth,map[t.index -d]);
-        if (t.index < d || depth == 0) { return t; }
-        if (t.index >= d + depth) { return Var(t.index-depth, preferred_name=t.preferred_name); }
-        const m = map[t.index -d];
-        if (m) { return  m; }
-        else { throw {[c]: 'MetaMatchFailed'}; }
-      case "All" : return All(t.name, mm(t.dom,d), mm(t.cod,d+1));
-      case "Lam" : return Lam(t.name, t.type && mm(t.type,d) , mm(t.body,d+1) );
-      case "App" : return App( mm(t.func,d) , mm(t.argm,d) );
-      case "MVar": return MVar(t.name, t.args.map( (t)=>mm(t,d) ));
-      default: return t;
-    }
-  }
-  let res = mm(term,0);
-  console.log("MetaMatch returns: ",res);
-  return res;
-}
-
 // Meta-variables substitution
 // The map is an object whose keys are meta-variable names
 // and values are arrays of shifted terms to substitute
 function meta_subst(term, map) {
   function ms(t,d) {
-    console.log(t,d);
     switch (t[c]) {
       case "MVar":
         const args = t.args.map((t)=>ms(t,d));
         const s = map[t.name];
-        console.log(s,s[0],d,s[d]);
         if (!s) { return MVar(t.name,args); }
         if (!s[d]) { s[d] = shift(s[0],inc=d); }
-        console.log(s,s[0],d,s[d]);
         return meta_subst(s[d], args.map((t)=>[t]));
       case "All" : return All(t.name, ms(t.dom,d) , ms(t.cod,d+1) );
       case "Lam" : return Lam(t.name, t.type && ms(t.type,d) , ms(t.body,d+1) );
@@ -199,7 +172,6 @@ function meta_subst(term, map) {
   }
   return ms(term,0);
 }
-
 
 // Infers the type of a term
 function infer(term, env, red, ctx = Ctx()) {
@@ -309,9 +281,16 @@ function process_instruction(ins, env, red) {
   case "Infer":
     log_info("Infer",pp_term(infer(ins.term, env, red)));
     break;
-  case "Check":
+  case "CheckType":
     check(ins.term, ins.type, env, red);
-    log_ok("Check",pp_term(ins.term)+" has indeed type "+pp_term(ins.type));
+    log_ok("CheckType",pp_term(ins.term)+" has indeed type "+pp_term(ins.type));
+    break;
+  case "CheckConv":
+    if (are_convertible(ins.lhs, ins.rhs, red)) {
+      log_ok("CheckConv",pp_term(ins.lhs)+" is indeed convertible with "+pp_term(ins.rhs));
+    } else {
+      log_warn("CheckConv",pp_term(ins.lhs)+" is not convertible with "+pp_term(ins.rhs));
+    }
     break;
   case "Print":
     log_info("Show",pp_term(ins.term));

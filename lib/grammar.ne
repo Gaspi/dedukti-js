@@ -23,6 +23,7 @@ const lexer = makeLexer({
     DOT     :'.',
     COMMA   :',',
     DEF     :':=',
+    CONV    :'==',
     COLON   :':',
     LEFTSQU :'[',
     RIGHTSQU:']',
@@ -57,12 +58,13 @@ line ->
     %ID param:* %COLON term                 %END {% ([id,params,,ty,     ]) => Decl(id.value,params,ty) %}
   | %ID param:* %COLON term %DEF term       %END {% ([id,params,,ty,,def,]) => Def(id.value,params,ty,def) %}
   | %ID:? %COLON term %LONGARROW term       %END {% ([id,c,lhs,,rhs,])      => Rew(lhs,rhs, id?id.value:'unnamed'+c.line) %}
-  | %CMD_REQ    %ID                         %END {% ([,id])         => CmdReq(id)     %}
-  | %CMD_REQ    %QID %LEFTSQU %ID %RIGHTSQU %END {% ([,id,,alias,]) => CmdReq(id) %}
-  | %CMD_EVAL   term                        %END {% ([,t])          => CmdEval(t)     %}
-  | %CMD_INFER  term                        %END {% ([,t])          => CmdInfer(t)    %}
-  | %CMD_CHECK  aterm %COLON term           %END {% ([,t,,ty])      => CmdCheck(t,ty) %}
-  | %CMD_PRINT  term                        %END {% ([,t])          => CmdPrint(t)    %}
+  | %CMD_REQ    %ID                         %END {% ([,id])         => CmdReq(id)          %}
+  | %CMD_REQ    %QID %LEFTSQU %ID %RIGHTSQU %END {% ([,id,,alias,]) => CmdReq(id,alias)    %}
+  | %CMD_EVAL   term                        %END {% ([,t])          => CmdEval(t)          %}
+  | %CMD_INFER  term                        %END {% ([,t])          => CmdInfer(t)         %}
+  | %CMD_CHECK  aterm %COLON term           %END {% ([,t,,ty])      => CmdCheckType(t,ty)  %}
+  | %CMD_CHECK  aterm %CONV term            %END {% ([,t1,,t2])     => CmdCheckConv(t1,t2) %}
+  | %CMD_PRINT  term                        %END {% ([,t])          => CmdPrint(t)         %}
 
 param -> %LEFTPAR %ID %COLON term %RIGHTPAR {% ([,v,,ty]) => [v,ty] %}
 

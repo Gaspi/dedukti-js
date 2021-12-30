@@ -1,0 +1,24 @@
+A : Type;
+
+a : A;
+b : A;
+c : A;
+d : A;
+
+g : A -> A;
+h : A -> A -> A -> A;
+i : A -> A -> A -> A -> A;
+
+f : A -> A -> A -> A -> A;
+: f a a a --> g;
+: f b --> h;
+: f --> i;
+
+
+#CHECK f a a a b == g b;
+#CHECK f c a b == i c a b;
+#CHECK f b a b == h a b;
+#CHECK f b a == h a;
+#CHECK f a a == i a a;
+#CHECK f a == i a;
+#CHECK f == i;

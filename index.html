@@ -19,10 +19,16 @@
 
 
 <div class="container">
-  <button class="" onclick="process_all_instructions();">Type Check !</button>
+
   <div class="row align-items-start">
+    <div class="col-sm-auto mx-3">
+    <ul>
+      <h2>Examples</h2>
+      <li> <a href='#' onclick="load('examples/arities.dk');"> arities.dk </a> </li>
+    </ul>
+    </div>
     <div class="col mx-3">
-      <h1>Code</h1>
+      <h2>Code</h2>
       <div class="form-outline mx-3">
 <textarea class="form-control" id="code" rows="30">
 #REQUIRE test;
@@ -54,7 +60,7 @@ g2 : g * (x=>X[x]) --> X[a];
       </div>
     </div>
     <div class="col mx-3">
-      <h1>Ouput</h1>
+      <h2>Ouput <button class="" onclick="process_all_instructions();">Type Check !</button> </h2>
       <div class="mx-3" id="logs"></div>
     </div>
 
@@ -132,6 +138,10 @@ function process_all_instructions() {
     log_err(e);
     if (debug) { throw e; }
   }
+}
+
+function load(path) {
+  
 }
 
 </script>
