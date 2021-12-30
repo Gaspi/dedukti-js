@@ -56,13 +56,13 @@ lines -> line:* {% ([t]) => t %}
 line ->
     %ID param:* %COLON term                 %END {% ([id,params,,ty,     ]) => Decl(id.value,params,ty) %}
   | %ID param:* %COLON term %DEF term       %END {% ([id,params,,ty,,def,]) => Def(id.value,params,ty,def) %}
-  | %ID:? %COLON term %LONGARROW term       %END {% ([id,,lhs,,rhs,]) => Rew(lhs,rhs, id?id.value:null) %}
-  | %CMD_REQ    %ID                         %END {% ([,id])    => CmdReq(id)     %}
-  | %CMD_REQ    %QID %LEFTSQU %ID %RIGHTSQU %END {% ([,id,,alias,])    => CmdReq(id) %}
-  | %CMD_EVAL   term                        %END {% ([,t])     => CmdEval(t)     %}
-  | %CMD_INFER  term                        %END {% ([,t])     => CmdInfer(t)    %}
-  | %CMD_CHECK  aterm %COLON term           %END {% ([,t,,ty]) => CmdCheck(t,ty) %}
-  | %CMD_PRINT  term                        %END {% ([,t])     => CmdPrint(t)    %}
+  | %ID:? %COLON term %LONGARROW term       %END {% ([id,c,lhs,,rhs,])      => Rew(lhs,rhs, id?id.value:'unnamed'+c.line) %}
+  | %CMD_REQ    %ID                         %END {% ([,id])         => CmdReq(id)     %}
+  | %CMD_REQ    %QID %LEFTSQU %ID %RIGHTSQU %END {% ([,id,,alias,]) => CmdReq(id) %}
+  | %CMD_EVAL   term                        %END {% ([,t])          => CmdEval(t)     %}
+  | %CMD_INFER  term                        %END {% ([,t])          => CmdInfer(t)    %}
+  | %CMD_CHECK  aterm %COLON term           %END {% ([,t,,ty])      => CmdCheck(t,ty) %}
+  | %CMD_PRINT  term                        %END {% ([,t])          => CmdPrint(t)    %}
 
 param -> %LEFTPAR %ID %COLON term %RIGHTPAR {% ([,v,,ty]) => [v,ty] %}
 
@@ -84,12 +84,12 @@ sterm ->
 aterm -> sterm sterm:* {% ([te,ts]) => app(te,ts) %}
 
 term ->
-    aterm                                           {% ([t]) => t %}
-  | %ID %COLON aterm %ARROW term                    {% ([ id,,dom, ,cod]) => All(id.value,dom,cod) %}
-  | %LEFTPAR %ID %COLON aterm %RIGHTPAR %ARROW term {% ([,id,,dom,,,cod]) => All(id.value,dom,cod) %}
-  | aterm %ARROW term                               {% ([    dom, ,cod])  => All(null,dom,cod) %}
-  | %ID %FATARROW term                              {% ([id,,body])       => Lam(id.value,Star(),body) %}
-  | %ID %COLON aterm %FATARROW term                 {% ([id,,type,,body]) => Lam(id.value,type,body) %}
+    aterm                                              {% ([t]) => t %}
+  | %ID %COLON aterm %ARROW term                       {% ([ id,,dom, ,cod]) => All(id.value,dom,cod) %}
+  | %LEFTPAR %ID %COLON aterm %RIGHTPAR %ARROW term    {% ([,id,,dom,,,cod]) => All(id.value,dom,cod) %}
+  | aterm %ARROW term                                  {% ([     dom, ,cod]) => All(null,dom,cod) %}
+  | %ID %FATARROW term                                 {% ([id,,body])       => Lam(id.value,Star(),body) %}
+  | %ID %COLON aterm %FATARROW term                    {% ([id,,type,,body]) => Lam(id.value,type,body) %}
   | %LEFTPAR %ID %COLON aterm %RIGHTPAR %FATARROW term {% ([,id,,type,,,body]) => Lam(id.value,type,body) %}
   | %LEFTPAR %ID %COLON aterm %DEF aterm %RIGHTPAR %FATARROW term
     {% ([,id,,type,,val,,,body]) => App(Lam(id.value,type,body), val) %}

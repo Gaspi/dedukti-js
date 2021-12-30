@@ -40,9 +40,10 @@ f : T -> T := x => x;
 
 // Custom rewrite rules
 g : t:T -> a:A t -> B t a;
-: g X a --> X;
-: g * (x=>X[x]) --> X[a];
+g1 : g X a --> X;
+g2 : g * (x=>X[x]) --> X[a];
 #EVAL g a a;
+#EVAL g (g b (x => f x)) a;
 
 // Basic commands
 #PRINT A;
