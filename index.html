@@ -131,7 +131,7 @@ function process_all_instructions() {
     log_ok("Parsing","done.");
     // Reseting the environnement
     env = Env();
-    red = Red();
+    red = new ReductionEngine();
     instructions.forEach((ins)=>process_instruction(ins,env,red));
     log_ok("All done !","");
   } catch(e) {

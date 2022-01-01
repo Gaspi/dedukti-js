@@ -1,5 +1,4 @@
 
-
 function scope_instruction(ins, env) {
   if (ins.term) { ins.term = scope(ins.term, env); }
   if (ins.type) { ins.type = scope(ins.type, env); }
@@ -44,88 +43,6 @@ function scope(e, env, ctx=Ctx()) {
   return e;
 }
 
-
-// Shifts variables deeper than [depth] by [inc] in the term [term]
-function shift(term, inc=1, depth=0) {
-  switch (term[c]) {
-    case "Typ": return Typ();
-    case "Star": return Star();
-    case "Var":
-      return Var(term.index < depth ? term.index : term.index + inc);
-    case "Ref":
-      return Ref(term.name);
-    case "All":
-      const dom = shift(term.dom,inc,depth+1);
-      const cod = shift(term.cod,inc,depth  );
-      return All(term.name,dom,cod);
-    case "Lam":
-      const type = term.type && shift(term.type, inc, depth  );
-      const body =              shift(term.body, inc, depth+1);
-      return Lam(term.name, type, body);
-    case "App":
-      return App(shift(term.func, inc, depth), shift(term.argm, inc, depth));
-    case "MVar":
-      return MVar(term.name,term.args.map((t)=>shift(t, inc, depth)));
-    default:
-      throw "Shift:\nUnexpected constructor:"+term[c];
-  }
-}
-
-// Check that a and b have compatible head. Stacks conversion-relevant subterms in t.
-function same_head(a,b,acc) {
-  if (a[c] !== b[c]) { return false; }
-  switch (a[c]) {
-    case "Var":
-      if (a.index !== b.index) { return false; }
-      break;
-    case "Ref":
-      if (a.name !== b.name) { return false; }
-      break;
-    case "All":
-      acc.push({a:a.dom,b:b.dom});
-      acc.push({a:a.cod,b:b.cod});
-      break;
-    case "Lam":
-      acc.push({a:a.body,b:b.body});
-      break;
-    case "App":
-      acc.push({a:a.func,b:b.func});
-      acc.push({a:a.argm,b:b.argm});
-      break;
-    case "MVar":
-      if (a.name !== b.name || a.args.length !== b.args.length) { return false; }
-      for (let i = 0; i < a.args.length; i++) {
-        acc.push({a:a.args[i],b:b.args[i]});
-      }
-      break;
-    case "Typ":
-    case "Knd":
-    case "Star": break;
-    default: throw "Equals:\nUnexpected constructor: "+term[c];
-  }
-  return true;
-}
-
-function equals(u, v) {
-  const acc = [ {a:u,b:v} ];
-  while (acc.length > 0) {
-    const {a,b} = acc.pop();
-    if (a == b) { continue; }
-    if (!same_head(a,b,acc)) { return false; }
-  }
-  return true;
-}
-
-// Checks if two terms are equal
-function are_convertible(u, v, red) {
-  const acc = [ {a:u,b:v} ];
-  while (acc.length > 0) {
-    const {a,b} = acc.pop();
-    if (equals(a,b)) { continue; }
-    if (!same_head( whnf(a,red) , whnf(b,red) ,acc)) { return false; }
-  }
-  return true;
-}
 
 // Substitutes [val] for variable with DeBruijn index [depth]
 // and downshifts all variables referencing beyond that index:
@@ -181,10 +98,10 @@ function infer(term, env, red, ctx = Ctx()) {
     case "All":
       const dom = infer(term.dom, env, red, ctx);
       const cod = infer(term.cod, env, red, extend(ctx, [term.name, term.dom]));
-      if (!are_convertible(dom, Typ(), red)) {
+      if (!red.are_convertible(dom, Typ())) {
         throw "Infer:\nDomain of forall is not a type: `" + pp_term(term, ctx) + "`.\n\n[CONTEXT]\n" + pp_context(ctx);
       }
-      if (!are_convertible(cod, Typ(), red) && !are_convertible(cod, Knd(), red)) {
+      if (!red.are_convertible(cod, Typ()) && !red.are_convertible(cod, Knd())) {
         throw "Infer:\nCodomain of forall is neither a type nor a kind: `" + pp_term(term, ctx) + "`.\n\n[CONTEXT]\n" + pp_context(ctx);
       }
       return cod;
@@ -198,7 +115,7 @@ function infer(term, env, red, ctx = Ctx()) {
         return term_t;
       }
     case "App":
-      const func_t = whnf(infer(term.func, env, red, ctx), env, red);
+      const func_t = red.whnf(infer(term.func, env, red, ctx));
       if (func_t[c] !== "All") {
         throw "Infer:\nNon-function application on `" + pp_term(term, ctx) + "`.\n\n[CONTEXT]\n" + pp_context(ctx);
       }
@@ -217,7 +134,7 @@ function infer(term, env, red, ctx = Ctx()) {
 // Checks if a term has given type
 function check(term, type, env, red, ctx = Ctx(), expr) {
   var expr = expr || (() => pp_term(term, ctx));
-  var type = whnf(type, env);
+  var type = red.whnf(type, env);
   if (type[c] === "All" && term[c] === "Lam" && !term.type) {
     infer(type, env, red, ctx);
     const ex_ctx = extend(ctx, [type.name, type.dom]);
@@ -225,7 +142,7 @@ function check(term, type, env, red, ctx = Ctx(), expr) {
     return Lam(type.name, type.dom, body_v);
   } else {
     const term_t = infer(term, env, red, ctx);
-    if (!are_convertible(type, term_t, red)) {
+    if (!red.are_convertible(type, term_t)) {
       throw "Check:"                     +"\n"+
         "Type mismatch on " + expr()+"." +"\n"+
         "- Expect = " + pp_term(type  , ctx)+"\n"+
@@ -244,7 +161,7 @@ function check_rule_type_preserving(env,rule) {
 // Checks declared type and adds a new symbol to the environment
 function declare_symbol(env, red, ins) {
   const sort = infer(ins.type, env, red);
-  if (!are_convertible(sort,Typ(),red) && !are_convertible(sort,Knd(),red)) {
+  if (!red.are_convertible(sort,Typ()) && !red.are_convertible(sort,Knd())) {
     throw "Declaration:\nDeclared type is not a sort.: `" + pp_term(ins.type) + "`.";
   }
   add_new_symbol(env,ins.name,ins.type);
@@ -254,7 +171,7 @@ function declare_symbol(env, red, ins) {
 // Checks type preservation and add a new rule to the reduction machine
 function declare_rule(env,red,rule) {
   check_rule_type_preserving(env,rule);
-  add_new_rule(red,rule);
+  red.add_new_rule(rule);
   log_ok("Rewrite rule added",pp_term(rule.lhs)+ " --\> " + pp_term(rule.rhs));
 }
 
@@ -276,7 +193,7 @@ function process_instruction(ins, env, red) {
   case "Req":
     break;
   case "Eval":
-    log_info("Eval",pp_term(nf(ins.term, red)));
+    log_info("Eval",pp_term(red.nf(ins.term)));
     break;
   case "Infer":
     log_info("Infer",pp_term(infer(ins.term, env, red)));
@@ -286,7 +203,7 @@ function process_instruction(ins, env, red) {
     log_ok("CheckType",pp_term(ins.term)+" has indeed type "+pp_term(ins.type));
     break;
   case "CheckConv":
-    if (are_convertible(ins.lhs, ins.rhs, red)) {
+    if (red.are_convertible(ins.lhs, ins.rhs)) {
       log_ok("CheckConv",pp_term(ins.lhs)+" is indeed convertible with "+pp_term(ins.rhs));
     } else {
       log_warn("CheckConv",pp_term(ins.lhs)+" is not convertible with "+pp_term(ins.rhs));

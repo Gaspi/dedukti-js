@@ -1,0 +1,19 @@
+N : Type;
+0 : N;
+S : N -> N;
+
+A : N -> Type;
+: A 0 --> N;
+: A (S X) --> N -> A X;
+
+f : x : N -> A x;
+
+g : N -> N;
+: g (f 0            ) --> 0;
+: g (f (S 0)     0  ) --> S 0;
+: g (f (S (S 0)) 0 0) --> S (S 0);
+
+
+#CHECK g (f 0            ) == 0;
+#CHECK g (f (S 0)     0  ) == S 0;
+#CHECK g (f (S (S 0)) 0 0) == S (S 0);
