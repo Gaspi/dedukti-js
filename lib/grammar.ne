@@ -22,7 +22,12 @@ const lexer = makeLexer({
     COMMENT: /\/\/.*?$/,
     DOT     :'.',
     COMMA   :',',
+    ARROW   :'->',
+    FATARROW:'=>',
+    LONGARROW:'-->',
+    LONGFATARROW:'==>',
     DEF     :':=',
+    ENT :'|-',
     CONV    :'==',
     COLON   :':',
     LEFTSQU :'[',
@@ -33,9 +38,6 @@ const lexer = makeLexer({
     RIGHTPAR:')',
     STAR    :'*',
     END     :';',
-    ARROW   :'->',
-    FATARROW:'=>',
-    LONGARROW:'-->',
     TYPE:"Type",
     KIND:"Kind",
     CMD_REQ  :"#REQUIRE",
@@ -43,6 +45,7 @@ const lexer = makeLexer({
     CMD_INFER:"#INFER",
     CMD_CHECK:"#CHECK",
     CMD_PRINT:"#PRINT",
+    DB_INDEX:/\#[0-9]+/,
     QID: /(?:[a-zA-Z0-9_']+\.)+[a-zA-Z0-9_\-!?']+/,
     ID: /[a-zA-Z0-9_!?']+/,
   }, ['_','COMMENT']);
@@ -57,14 +60,20 @@ lines -> line:* {% ([t]) => t %}
 line ->
     %ID param:* %COLON term                 %END {% ([id,params,,ty,     ]) => Decl(id.value,params,ty) %}
   | %ID param:* %COLON term %DEF term       %END {% ([id,params,,ty,,def,]) => Def(id.value,params,ty,def) %}
-  | %ID:? %COLON term %LONGARROW term       %END {% ([id,c,lhs,,rhs,])      => Rew(lhs,rhs, id?id.value:'unnamed'+c.line) %}
+  | %ID:? %COLON term %LONGARROW    term    %END {% ([id,c,lhs,,rhs,])      => Rew(lhs,rhs,id?id.value:'unnamed'+c.line) %}
+  | %ID:? %COLON term %LONGFATARROW term    %END {% ([id,c,lhs,,rhs,])      => Rew(lhs,rhs,id?id.value:'unnamed'+c.line,false) %}
   | %CMD_REQ    %ID                         %END {% ([,id])         => CmdReq(id)          %}
   | %CMD_REQ    %QID %LEFTSQU %ID %RIGHTSQU %END {% ([,id,,alias,]) => CmdReq(id,alias)    %}
-  | %CMD_EVAL   term                        %END {% ([,t])          => CmdEval(t)          %}
-  | %CMD_INFER  term                        %END {% ([,t])          => CmdInfer(t)         %}
-  | %CMD_CHECK  aterm %COLON term           %END {% ([,t,,ty])      => CmdCheckType(t,ty)  %}
-  | %CMD_CHECK  aterm %CONV term            %END {% ([,t1,,t2])     => CmdCheckConv(t1,t2) %}
+  | %CMD_EVAL  ctxt term                        %END {% ([,c,t])          => CmdEval(c,t)          %}
+  | %CMD_INFER ctxt term                        %END {% ([,c,t])          => CmdInfer(c,t)         %}
+  | %CMD_CHECK ctxt aterm %COLON term           %END {% ([,c,t,,ty])      => CmdCheckType(c,t,ty)  %}
+  | %CMD_CHECK ctxt aterm %CONV term            %END {% ([,c,t1,,t2])     => CmdCheckConv(c,t1,t2) %}
   | %CMD_PRINT  term                        %END {% ([,t])          => CmdPrint(t)         %}
+
+assign -> %ID %COLON term {% ([name,,type]) => [name.value,type] %}
+
+ctxt -> null {% () => [] %} | %ENT {% () => [] %} | assign _ctxt:* %ENT {% ([a,args]) => [a].concat(args) %}
+_ctxt -> %COMMA assign {% ([,a]) => a %}
 
 param -> %LEFTPAR %ID %COLON term %RIGHTPAR {% ([,v,,ty]) => [v,ty] %}
 
@@ -81,6 +90,7 @@ sterm ->
   | %ID %LEFTSQU args %RIGHTSQU {% ([id,,args]) => MVar(id.value,args) %}
   | %ID                         {% ([id]) => PreScope(id.value) %}
   | %QID                        {% ([id]) => PreRef(id.value) %}
+  | %DB_INDEX                   {% ([dbi]) => Var( parseInt(dbi.value.substring(1)) ) %}
   | %LEFTPAR term %RIGHTPAR     {% ([,t,]) => t %}
 
 aterm -> sterm sterm:* {% ([te,ts]) => app(te,ts) %}

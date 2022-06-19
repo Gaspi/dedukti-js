@@ -1,0 +1,27 @@
+<textarea class="form-control" id="code" rows="30">
+#REQUIRE test;
+
+// Declarations
+T : Type;
+A : T -> Type;
+B : t:T -> A t -> Type;
+t : T;
+a : A t;
+b : B t a;
+
+// Definitions
+f : T -> T := x => x; 
+
+// Custom rewrite rules
+g : t:T -> a:A t -> B t a;
+g1 : g X a --> X;
+g2 : g * (x=>X[x]) --> X[a];
+#EVAL g a a;
+#EVAL g (g b (x => f x)) a;
+
+// Basic commands
+#PRINT A;
+#INFER x:T => T;
+#EVAL (x=>x) (y=>y) (z=>T);
+#CHECK T : Type;
+</textarea>

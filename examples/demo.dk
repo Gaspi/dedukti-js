@@ -1,0 +1,77 @@
+Prop : Type;
+Proof : Prop -> Type;
+
+#INFER a : Prop |- a;
+
+impl : Prop -> Prop -> Prop;
+: Proof (impl a b) ==> Proof a -> Proof b;
+
+False : Prop;
+ex_falso : a:Prop -> Proof False -> Proof a;
+
+and : Prop -> Prop -> Prop;
+and_cons : a : Prop -> b : Prop -> Proof a -> Proof b -> Proof(and a b);
+and_left : (a : Prop) -> (b : Prop) -> Proof (and a b) -> Proof a;
+and_right : (a : Prop) -> (b : Prop) -> Proof (and a b) -> Proof b;
+
+or : Prop -> Prop -> Prop;
+or_left : a : Prop -> b : Prop -> Proof a -> Proof (or a b);
+or_right : a : Prop -> b : Prop -> Proof b -> Proof (or a b);
+or_dest : a : Prop -> b : Prop -> c:Prop ->
+  Proof (impl a c) ->
+  Proof (impl b c) ->
+  Proof (or a b) ->
+  Proof c;
+
+not : Prop -> Prop := a:Prop => impl a False;
+
+morgan_2 : a : Prop -> b : Prop -> Proof (or (not a) (not b)) -> Proof (not (and a b))
+:=
+c : Prop =>
+d : Prop =>
+p : Proof (or (not c) (not d))  =>
+p2 : Proof  (and c d) =>
+  or_dest (not c) (not d) False
+    (p_not_c : Proof (not c) =>p_not_c (and_left c d p2) )
+    (p_not_d : Proof (not d) =>p_not_d (and_right c d p2))
+    p
+;
+morgan_3 : a : Prop -> b : Prop -> Proof (not (or a b)) -> Proof (and (not a) (not b));
+morgan_4 : a : Prop -> b : Prop -> Proof (and (not a) (not b)) -> Proof (not (or a b));
+
+ax : a : Prop -> Proof (not (not a)) -> Proof a;
+
+morgan_1 : a : Prop -> b : Prop -> Proof (not (and a b)) -> Proof (or (not a) (not b));
+
+
+Set : Type;
+El : Set -> Type;
+
+exists : T : Set -> (El T -> Prop) -> Prop;
+cons :
+   T : Set -> 
+   P : (El T -> Prop)  ->
+   n : (El T) ->
+   Proof (P n) ->
+   Proof (exists T P);
+
+nat : Set;
+Nat : Type := El nat;
+0 : Nat;
+S : Nat -> Nat;
+
+nat_ind :
+  P : (Nat -> Prop) ->
+  Proof (P 0) ->
+  (n:Nat -> Proof (impl (P n) (P (S n)))) ->
+  n:Nat -> Proof (P n);
+
+add : Nat -> Nat  -> Nat;
+: add 0 y ==> x;
+: add (S x) y ==> S (add x y);
+
+
+equal : Nat -> Nat -> Prop;
+refl :  ( x:Nat -> Proof (equal x x) );
+transitivity_equal : a:Nat -> b:Nat -> c:Nat -> Proof (equal a b) -> Proof (equal b c) -> Proof (equal a c);
+commu_equal : a:Nat -> b:Nat -> Proof (equal a b) -> Proof (equal b a);

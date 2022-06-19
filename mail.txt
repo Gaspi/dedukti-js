@@ -1,0 +1,114 @@
+Hi everyone,
+
+I hope everything is going alright for the Deducteam !
+I would like to share a couple of brain-teasers about the checking of a rewrite rule's type preservation property.
+I'd be more than happy to have your feedback on them if you ever find the time to read the following.
+
+
+I'll assume the following prefix signature (the examples are each an extension of it):
+  S : Type.
+  T : S -> Type.
+  nat : S.
+  0 : T nat.
+Please excuse the "old" syntax.
+
+A rule is type preserving if for all instance of the LHS well-typed in a context,
+the corresponding RHS is well-typed in the same context and with the same type.
+To (automatically) check the type preservation of a rule, it is then natural to:
+- First examine the LHS to infer some general properties of its well-typed instances
+- Use these properties to check that all instances of the RHS that satisfy them
+  are also well-typed (with the same type).
+
+The typical way to proceed (to my knowledge the one implemented in the Deduktis) is to infer
+ (1) unification constraints (e.g. T X = T nat) which are then processed using
+     injectivity of symbols up until a partial substitution (e.g. X = nat) is found.
+ (2) a type for each meta-variable (a product type for higher-order metavars)
+This algorithm is natural because the two kind of information, "X has type Y"
+and "X is convertible with t", are both very easily reusable in the checking of the RHS.
+
+I remember some joint effort with Guillaume Genestier to try and extend the first kind
+of property (unification constraints) to more general equations (e.g. T x = T nat)
+that sometimes may not be refined but are sufficient "as is" to check the RHS.
+  f :  s:S -> T s -> T s.
+  f X 0 --> 0.
+Looking at the LHS, by type declaration, 0 : T nat, and,
+by assumption of the well-typedness of the RHS, 0 : T X,
+therefore all well-typed instances must satisfy T nat = T X.
+All well-typed instances of the LHS have type T X (or rather the "corresponding instance" of T X).
+The RHS is always well-typed with type T nat.
+In that (very) particular case, it is easy to see how the infered (unrefined) equation
+constraint is sufficient to check the type preservation.
+I'm sure there are still many ways to extend that criteria.
+
+However I am rather interested, here, in extending
+the second kind of inferrable properties (2).
+
+0) Quick note:
+The well-typedness of higher-order meta-variables on the LHS is assumed
+*for all instances of the locally bounded variables*.
+  e : (s:S -> T s) -> T nat.
+  e (s => X[s]) --> X[nat].
+Here X[s] has type T s in the context where s:S. Since s is abstract, this is interpreted
+as the property "for all s:S, X[s] : T s" which allows to derive, in particular, X[nat] : T nat,
+therefore proving the type preservation property of this example.
+Of course, in that case, it is quite natural to represent this typing property with
+the typing assignment "X : s:S -> T s".
+
+1) First remark:
+In the general case however, types assigned to a meta-variable may very well contain
+variables that are not passed as arguments.
+  P : S -> Type.
+  f : (s:S -> T s -> (T s -> T s) -> P s) -> P nat;
+  f (s => z => n => X[z,n]) --> X[0,x=>x];
+The rewrite rule is type preserving since the assumed well-typedness of the LHS
+requires the following typing assumption to hold
+  (forall s,z,n)   s:S, z:T s, n:(T s -> T s) |- X[z,n] : P s
+This condition is not easily represented with a product type for X (to say the least).
+Instead a type condition should be inferred for X *together with a full context*.
+(it could actually be restricted only to the accessible variables but with little interest).
+Note that this means that
+  X[0,x=>x] : P s   FOR ALL s such that  0 : T s and x=>x : T s -> T s
+s = nat provides one type, P nat, for X[0,x=>x] but it may not be the only one.
+Depending on the definition of T, there could be other terms t such that T t = T nat.
+Such other candidates could even be such that P t is not convertible with P nat.
+Because we are reasonning "for all s", all the candidates P t are suitable types for the instance
+of X in the RHS.
+
+Therefore X[0,x=>x] cannot safely be inferred a single type. It can however be checked one.
+To check that  X[0,x=>x] : P nat  is actually to solve
+the following unification problem for s,z,n:
+  - X[0,x=>x] :          P s   = P nat
+  - 0         :          T nat = T s
+  - x=>x      : T nat -> T nat = T s -> T s
+  -                          z = 0
+  -                          n = x=>x
+The last two equations are unimportant here but may be in the general case
+(for instance if the type of n references z).
+
+A shorter example:
+  g : (s:S -> T s) -> T nat
+  g (s => X) --> X.
+Here X is such that (forall s)   s:S |- X : T s
+In particular, X : T nat and the rule is well typed.
+
+-2) Second remark:
+In non-linear rules, each instance of a meta-variable X provides a possible
+type for X. These types are both eligible in the RHS.
+  A : Type.
+  B : Type.
+  a : A.
+  h : (A -> B) -> (B -> A) -> A.
+  h (x => X[x]) (y => X[y]) --> X[ X[a] ].
+Since the well-typedness of the LHS implies both
+that (forall x) x:A |- X[x]:B and that (forall x) x:B |- X[x]:A
+
+
+I believe it would require a tremendous amount of work to use these ideas to extend
+a type checking algorithm so that it would accept the last three examples (f,g,h).
+Still, I find it pretty cool that such short example require such complicated criteria to check.
+What do you think ?
+
+Be well !
+Cheers
+
+Gaspard
