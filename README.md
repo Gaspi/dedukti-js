@@ -3,14 +3,21 @@
 ## Dependencies
 
 ```sh
-git clone https://github.com/kach/nearley.git
-git clone https://github.com/no-context/moo.git
-
+git clone git@github.com:kach/nearley.git
+git clone git@github.com:no-context/moo.git
 npm install -g nearley
+cp ./nearley/lib/nearley.js ./ressources/
+cp ./moo/moo.js ./ressources/
 ```
 
 ## Build
 
 ```sh
-make
+make Q=
 ```
+
+## Refresh codejar files
+
+Download [codejar.js](https://medv.io/codejar/codejar.js) and [linenumbers.js](https://medv.io/codejar/linenumbers.js)
+
+Remove the `export` keywords.
