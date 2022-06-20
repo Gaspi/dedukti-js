@@ -1,7 +1,5 @@
 # In browser Dedukti
 
-Inspired and adapted from [MaiaVictor/ESCoC](https://github.com/MaiaVictor/ESCoC).
-
 ## Dependencies
 
 ```sh
@@ -14,5 +12,5 @@ npm install -g nearley
 ## Build
 
 ```sh
-nearleyc grammar.ne > grammar.js
+nearleyc lib/grammar.ne > lib/grammar.js
 ```
