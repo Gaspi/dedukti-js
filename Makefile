@@ -18,7 +18,7 @@ Q = @
 
 all: build
 
-build: $(BUILD_SRC) $(BUILD_RESSOURCES) $(BUILD_EXAMPLES) $(BUILD_FOLDER)/index.html $(BUILD_FOLDER)/moo/moo.js $(BUILD_FOLDER)/nearley/lib/nearley.js $(BUILD_FOLDER)/codejar/codejar.js $(BUILD_FOLDER)/codejar/linenumbers.js
+build: $(BUILD_SRC) $(BUILD_RESSOURCES) $(BUILD_EXAMPLES) $(BUILD_FOLDER)/index.html
 	@echo "Build done !"
 
 clean:
@@ -27,10 +27,6 @@ clean:
 
 rebuild: clean build
 
-$(BUILD_FOLDER)/ressources/: %
-	$(Q)mkdir -m 775 -p "$(@D)"
-	$(Q)cp "$<" "$@"
-	$(Q)chmod a+rx "$@"
 $(BUILD_FOLDER)/%: %
 	$(Q)mkdir -m 775 -p "$(@D)"
 	$(Q)cp "$<" "$@"
