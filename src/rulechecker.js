@@ -1,4 +1,22 @@
 
+
+// Returns [term] where each free variables instance x#0 in turned into a meta-variable
+// whose name !3 corresponds to its DeBruijn *level*. (assuming ctx_size=4 in the example)
+function vars_to_meta(term, ctx_size, depth=0) {
+  function s(t,d) {
+    switch (t[c]) {
+      case "Var" : return t.index < d ? t: MVar('!'+(ctx_size - 1 - t.index + d));
+      case "All" : return All(t.name, s(t.dom,d) , s(t.cod,d+1) );
+      case "Lam" : return Lam(t.name, t.type && s(t.type,d) , s(t.body,d+1) );
+      case "App" : return App( s(t.func,d) , s(t.argm,d) );
+      case "MVar": return MVar(t.name, t.args.map((t)=>s(t,d)) );
+      default: return t;
+    }
+  }
+  return s(term,depth);
+}
+
+
 // Checks whether the given term is a non-pattern meta-variable instance.
 function is_non_pattern_instance(term) {
   // Applied meta-variable are offending
@@ -80,13 +98,14 @@ class RuleChecker {
   
   // Record a new type
   assume_mvar_type(assumptions,term, expected_type, ctx) {
+    const acc = [];
+    while (ctx) { acc.push(ctx.head); ctx = ctx.tail; }
     assumptions.assumed_types.append(
       {
-        ctx  : ctx,
         name : term.name,
-        args : term.args,
-        arity: term.args.length,
-        type : expected_type,
+        ctx  : acc.map((x,i)=> vars_to_meta(x,i)),
+        args : term.args.map(t=>'!'+(acc.length-t.index-1)),
+        type : vars_to_meta(expected_type,acc.length),
       });
   }
   
@@ -111,13 +130,16 @@ class RuleChecker {
   
   // Note: should rather return a list of possible types
   infer_mvar_type(assumptions, term, ctx) {
-    const get_mvar_type_from_assumption = function(assumption) {
+    function get_mvar_type_from_assumption(assumption) {
       if (assumption.name !== term.name) { return false; }
-      const arity = assumption.args.length
+      const arity = assumption.args.length;
+      const ctx_size = assumption.ctx.length;
       // Build the variable substitution
-      //   S = { assumption.args => term.args (shifted by position in assumption.ctx)  }
-      const S = Array();
-      for (let i = 0; i < assumption.args.len
+      //   S = { assumption.args => term.args (shifted by position in assumption.ctx) }
+      const S = {};
+      for(let i = 0; i < assumption.args.length; i++) {
+        S[assumption.args[i]] = term.args[i];
+      }
       // Check that it preserves
       // the well-typedness of assumption.ctx
       // Example : if   x:A , y:B[x], z:C[x,y], w:D[x,y,z]    with   S={z -> t}
@@ -129,7 +151,19 @@ class RuleChecker {
       //   - u:A
       // Build assumption.type substituted with S and with the variable substitution (with substitute shifted)
       // Unshift it to ensure contains no remaining variable and return it
-      
+      const unchecked = Array(ctx_size).fill(true);
+      while (true) {
+        // Find the first unchecked variable that is mapped to something in S
+        const i = unchecked.findIndex((t,i)=>t && S['!'+i]);
+        if (i<0) { break; } // if there are none, then the work is done: proceed
+        // else compute the expected type substituted with the partial substitution S
+        const type_of_ith = meta_subst(assumption.ctx[i],S);
+        // TODO : implement this check
+        // check(S['!'+i], type_of_ith);
+        unchecked[i] = false; // Never check this index again
+      }
+      const result = meta_subst(assumption.type,S);
+      return result;
     }
     return this.assumed_types.find(get_mvar_type_from_assumption);
   }
@@ -299,10 +333,10 @@ class RuleChecker {
     if (!is_closed(rule.lhs)) { fail("Rule","LHS must be a closed term."); }
     if (!is_closed(rule.rhs)) { fail("Rule","RHS must be a closed term."); }
     // A pattern is ill-formed if a subterm is a non-pattern or applied meta-variable instance
-    const illegal_instance = find_subterm(is_non_pattern_instance, rule.lhs);
-    if (illegal_instance) {
+    const nonpattern = find_subterm(is_non_pattern_instance, rule.lhs);
+    if (nonpattern) {
       fail("Rule","Meta-vars in LHS must only be applied to distinct variables `"+
-        pp_term(illegal_instance[0],illegal_instance[1]) + "`.");
+        pp_term(nonpattern[0],nonpattern[1]) + "`.");
     }
     // A pattern is ill-formed if a meta-variable occurs with distinct arities
     const arities = new Map();
@@ -312,10 +346,10 @@ class RuleChecker {
         arities[t.name] = t.args.length;
       }
     }
-    const illegal_instance = find_subterm(check_mvar, rule.lhs) || find_subterm(check_mvar, rule.rhs);
-    if (illegal_instance) {
+    const wrong_arity_instance = find_subterm(check_mvar, rule.lhs) || find_subterm(check_mvar, rule.rhs);
+    if (wrong_arity_instance) {
       fail("Rule","Meta-vars occurs with several distinct arities `"+
-        pp_term(illegal_instance[0],illegal_instance[1]) + "`.");
+        pp_term(wrong_arity_instance[0],wrong_arity_instance[1]) + "`.");
     }
   }
   
@@ -329,7 +363,7 @@ class RuleChecker {
   // Checks type preservation and add a new rule to the reduction machine
   declare_rule(rule) {
     this.check_rule_well_formed(rule);
-    this.check_rule_type_preservation(rule); }
+    this.check_rule_type_preservation(rule);
     this.red.add_new_rule(rule);
   }
   
