@@ -16,6 +16,14 @@ cp ./moo/moo.js ./ressources/
 make Q=
 ```
 
+## Run
+
+```sh
+cd build
+python3 -m http.server
+```
+
+
 ## Refresh codejar files
 
 Download [codejar.js](https://medv.io/codejar/codejar.js) and [linenumbers.js](https://medv.io/codejar/linenumbers.js)
