@@ -12,5 +12,5 @@ npm install -g nearley
 ## Build
 
 ```sh
-nearleyc lib/grammar.ne > lib/grammar.js
+make
 ```
