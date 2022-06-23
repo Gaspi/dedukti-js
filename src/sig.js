@@ -79,7 +79,13 @@ class Signature {
     // console.log("Check",term[c],term, pp_term(term,ctx));
     if (term[c] == 'MVar') { fail("Check", "Cannot check the type of a meta-variable instance: "+pp_term(term, ctx)); }
     const type = this.red.whnf(expected_type);
-    if (type[c] == "All" && term[c] == "Lam" && !term.type) {
+    if (type[c] == "All" && term[c] == "Lam") {
+      if (!term.type.star && !this.red.are_convertible(term.type, type.dom)) {
+        fail("Check", "Incompatible annotation `"+pp_term(term, ctx)+"`."+
+          "- Expect = " + pp_term(type.dom, ctx)+"\n"+
+          "- Actual = " + pp_term(term.type, ctx)+"\n"+
+          pp_context(ctx));
+      }
       this.infer(type, ctx);
       this.check(term.body, type.cod, extend(ctx, [type.name, type.dom]));
     } else {
@@ -102,4 +108,8 @@ class Signature {
     this.env.add_new_symbol(ins.name,ins.type);
   }
   
+  is_injective(term) {
+    return term[c] === 'Var' ||
+      (term[c] === 'MVar' && false) // TODO implement injective symbols
+  }
 }

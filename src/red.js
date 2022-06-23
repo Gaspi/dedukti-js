@@ -155,6 +155,9 @@ class ReductionEngine {
           if (!dtree.Var[head.index][hstack.length]) { return this.exec_dtree(dtree.def,stack); }
           hstack.forEach((e)=>stack.push(e));
           return this.exec_dtree(dtree.Var[head.index][hstack.length], stack);
+        case 'MVar':
+          return this.exec_dtree(dtree.def,stack);
+        default: fail("DTreeExec","Unexpected constructor in switch case: "+head[c]);
       }
     } else if (dtree[c] == 'Test') {
       const subst = new Map();

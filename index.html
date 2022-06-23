@@ -13,24 +13,29 @@
 </head>
 <body>
 
-<div class="container">
-  <div class="row align-items-start">
-    <div class="col mx-3">
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    <div class="col-3 mx-3">
       <h2>Examples</h2>
       <ul id="examples">
       </ul>
       <h2>Ouput <button class="" onclick="process_all_instructions();">Type Check !</button> </h2>
       <div class="mx-2" id="logs"></div>
       </div>
-    <div class="col mx-2">
+    <div class="col-6 mx-2">
       <h2>Code</h2>
       <div class="form-outline mx-3">
+        <div style="position: absolute; top: 0px; left: 0px; bottom: 0px; width: 35px; overflow: hidden; color: white; font-size: 16px; line-height: 24px; padding-top: 0px; padding-left: 0px;">
+          <div style="position: relative; top: 0px;">
+          1 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2
+          </div>
+        </div>
         <div id="editor" class="editor"></div>
       </div>
     </div>
 
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script> -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
 <script src="src/utils.js"></script>
 <script src="src/term.js"></script>
 <script src="src/context.js"></script>
@@ -118,7 +123,7 @@ function process_instruction(sig,rulechecker,ins) {
       break;
     case "Def":
       sig.declare_symbol(ins);
-      rulechecker.declare_rule( Rew(Ref(ins.name),ins.def,ins.name+"_def") );
+      rulechecker.declare_rule( Rew(ins.ln, Ref(ins.name),ins.def,ins.name+"_def") );
       log_ok("Symbol defined",ins.name+ " as " + pp_term(ins.def));
       break;
     case "Rew":
@@ -195,7 +200,7 @@ window.onload = function () {
     color:'white',
   }
   jar = CodeJar(editor, withLineNumbers(highlight, options=gutter_options), {tab: ' '.repeat(4)});
-  ['demo.dk','arities.dk','arities2.dk'].forEach(function(name) {
+  ['intro.dk', 'demo.dk','arities.dk','arities2.dk'].forEach(function(name) {
     const a  = document.createElement('a');
     a.setAttribute('href', '#');
     a.innerHTML = name;
@@ -204,6 +209,6 @@ window.onload = function () {
     li.appendChild(a);
     document.getElementById('examples').appendChild(li);
   })
-  load_example('demo.dk');
+  load_example('intro.dk');
 };
 </script>

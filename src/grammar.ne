@@ -58,17 +58,17 @@ const lexer = makeLexer({
 lines -> line:* {% ([t]) => t %}
 
 line ->
-    %ID param:* %COLON term                 %END {% ([id,params,,ty,     ]) => Decl(id.value,params,ty) %}
-  | %ID param:* %COLON term %DEF term       %END {% ([id,params,,ty,,def,]) => Def(id.value,params,ty,def) %}
-  | %ID:? %COLON term %LONGARROW    term    %END {% ([id,c,lhs,,rhs,])      => Rew(lhs,rhs,id?id.value:'unnamed'+c.line) %}
-  | %ID:? %COLON term %LONGFATARROW term    %END {% ([id,c,lhs,,rhs,])      => Rew(lhs,rhs,id?id.value:'unnamed'+c.line,false) %}
-  | %CMD_REQ    %ID                         %END {% ([,id])         => CmdReq(id)          %}
-  | %CMD_REQ    %QID %LEFTSQU %ID %RIGHTSQU %END {% ([,id,,alias,]) => CmdReq(id,alias)    %}
-  | %CMD_EVAL  ctxt term                        %END {% ([,c,t])          => CmdEval(c,t)          %}
-  | %CMD_INFER ctxt term                        %END {% ([,c,t])          => CmdInfer(c,t)         %}
-  | %CMD_CHECK ctxt aterm %COLON term           %END {% ([,c,t,,ty])      => CmdCheckType(c,t,ty)  %}
-  | %CMD_CHECK ctxt aterm %CONV term            %END {% ([,c,t1,,t2])     => CmdCheckConv(c,t1,t2) %}
-  | %CMD_PRINT  term                        %END {% ([,t])          => CmdPrint(t)         %}
+    %ID param:* %COLON term                     %END {% ([id,params,,ty,     e]) => Decl(e.line,id.value,params,ty) %}
+  | %ID param:* %COLON term %DEF term           %END {% ([id,params,,ty,,def,e]) => Def(e.line,id.value,params,ty,def) %}
+  | %ID:? %COLON term %LONGARROW    term        %END {% ([id,c,lhs,,rhs     ,e]) => Rew(e.line,lhs,rhs,id?id.value:'unnamed'+c.line) %}
+  | %ID:? %COLON term %LONGFATARROW term        %END {% ([id,c,lhs,,rhs     ,e]) => Rew(e.line,lhs,rhs,id?id.value:'unnamed'+c.line,false) %}
+  | %CMD_REQ    %ID                             %END {% ([,id               ,e]) => CmdReq(e.line,id)            %}
+  | %CMD_REQ    %QID %LEFTSQU %ID %RIGHTSQU     %END {% ([,id,,alias,       ,e]) => CmdReq(e.line,id,alias)      %}
+  | %CMD_EVAL  ctxt term                        %END {% ([,c,t              ,e]) => CmdEval(e.line,c,t)          %}
+  | %CMD_INFER ctxt term                        %END {% ([,c,t              ,e]) => CmdInfer(e.line,c,t)         %}
+  | %CMD_CHECK ctxt aterm %COLON term           %END {% ([,c,t,,ty          ,e]) => CmdCheckType(e.line,c,t,ty)  %}
+  | %CMD_CHECK ctxt aterm %CONV term            %END {% ([,c,t1,,t2         ,e]) => CmdCheckConv(e.line,c,t1,t2) %}
+  | %CMD_PRINT  term                            %END {% ([,t                ,e]) => CmdPrint(e.line,t)           %}
 
 assign -> %ID %COLON term {% ([name,,type]) => [name.value,type] %}
 

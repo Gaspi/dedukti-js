@@ -28,7 +28,7 @@ function pp_term(term, ctx = Ctx()) {
       return (term.name ? "("+term.name+" : "+dom+")" : dom) + " -> "+cod;
     case "Lam":
       let body = pp_term(term.body, extend(ctx, [term.name, null]));
-      return (term.type ? "("+term.name+" : "+pp_term(term.type,ctx)+")" : term.name) + " => "+body;
+      return "(" + (term.type ? "("+term.name+" : "+pp_term(term.type,ctx)+")" : term.name) + " => "+body+")";
     case "Knd": case "Typ": case "Var": case "PreScope": case "Ref": case "MVar":
       return pp_term_wp(term, ctx);
   }

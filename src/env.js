@@ -87,7 +87,6 @@ class Environment {
         if (e.star) {
           e.name = this.fresh_name();
           e.args = [...Array( ctx_size(ctx) ).keys()].map(MVar);
-          console.log(ctx, ctx_size(ctx), e.args);
         } else {
           for (let i = 0; i < e.args.length; i++) {
             e.args[i] = this.scope(e.args[i],ctx);

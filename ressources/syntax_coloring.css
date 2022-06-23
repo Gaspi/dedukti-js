@@ -1,3 +1,6 @@
+#editor {
+  font-family: monospace;
+}
 .KW { background-color:#E0F7FA; }
 .COMMENT   { color:gray; }
 .DOT       { color:darkgreen; font-weight:bold; }
@@ -17,7 +20,7 @@
 .LEFTPAR   { color:blue; }
 .RIGHTPAR  { color:blue; }
 .STAR      { color:blue; }
-.END       { color:darkgreen; font-weight:bold; }
+.END       { color:blue; font-weight:bold; }
 .TYPE      { color:darkgreen; font-weight:bold; }
 .KIND      { color:red; font-weight:bold; }
 .CMD_REQ   { color:blue; font-weight:bold; }

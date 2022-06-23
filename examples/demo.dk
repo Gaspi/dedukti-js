@@ -4,7 +4,7 @@ Proof : Prop -> Type;
 #INFER a : Prop |- a;
 
 impl : Prop -> Prop -> Prop;
-: Proof (impl a b) ==> Proof a -> Proof b;
+: Proof (impl a b) --> Proof a -> Proof b;
 
 False : Prop;
 ex_falso : a:Prop -> Proof False -> Proof a;
@@ -67,8 +67,8 @@ nat_ind :
   n:Nat -> Proof (P n);
 
 add : Nat -> Nat  -> Nat;
-: add 0 y ==> x;
-: add (S x) y ==> S (add x y);
+: add 0 x --> x;
+: add (S x) y --> S (add x y);
 
 
 equal : Nat -> Nat -> Prop;

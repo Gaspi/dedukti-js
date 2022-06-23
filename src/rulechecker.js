@@ -44,7 +44,13 @@ class Assumptions {
   }
   
   pp() {
-    return "\n[ASSUMPTIONS]\n";
+    let res = "\n[ASSUMED TYPES]\n";
+    this.assumed_types.forEach(function(a) {
+      res += a.ctx.map((t,i)=> "!"+i+" : "+pp_term(t)).join(", ")+ "  |-  " +
+        a.name+"["+ a.args.join(', ')+"] : "+pp_term(a.type)+"\n";
+    });
+    res += "\n[ASSUMED CONVERSIONS]\n";
+    return res;
   }
 }
 
@@ -58,38 +64,6 @@ class RuleChecker {
     this.red = sig.red;
   }
   
-  // TODO
-  add_typing_req(ctx,term,type) {
-    if (term[c]!='MVar') { fail('TypingReq', 'Term is not a meta-var: '+pp_term(term,ctx)); }
-    if (this.meta_typing_req.get(term.name)) {
-      fail('TypingReq', 'Meta-variable '+term.name+
-        ' was inferred two typing conditions (most likely non-linear).');
-    }
-    this.meta_typing_req.set(term.name, [ctx,term,type]);
-  }
-  
-  // TODO
-  add_typing_val(term,ctx,val) {
-    if (term[c]!='MVar') { fail('TypingVal', 'Term is not a meta-var `'+pp_term(term,ctx)+"`."); }
-    const prev_val = this.meta_value.get(term.name);
-    if (prev_val) {
-      if (!are_convertible( meta_subst(prev_val, term.args) ,val)) {
-        fail('MVarTyping','Two unconvertible values required for metavar '+term.name);
-      }
-    } else {
-      const msubst = get_meta_match(ctx);
-      const mval = meta_match(val, msubst);
-      const meta_subst = { [term.name]: mval };
-      // TODO
-      const typing_req = this.meta_typing_req.get(term.name);
-      // Should never happen...
-      if (!typing_req) { fail('MVarTyping','No Type inferred for metavar '+term.name); }
-      const [ctx,term,type] = typing_req;
-      this.check(term,type,ctx);
-      this.meta_value.set(term.name, meta_subst);
-    }
-  }
-  
   //////////////////////////////////////////////////////////////
   //////   Typing and convertion assumptions mechanisms  ///////
   //////////////////////////////////////////////////////////////
@@ -99,8 +73,8 @@ class RuleChecker {
   // Record a new type
   assume_mvar_type(assumptions,term, expected_type, ctx) {
     const acc = [];
-    while (ctx) { acc.push(ctx.head); ctx = ctx.tail; }
-    assumptions.assumed_types.append(
+    while (ctx) { acc.push(ctx.head[1]); ctx = ctx.tail; }
+    assumptions.assumed_types.push(
       {
         name : term.name,
         ctx  : acc.map((x,i)=> vars_to_meta(x,i)),
@@ -114,7 +88,34 @@ class RuleChecker {
     // TODO : we should record information from this assumed conversion
     // and only return a false-value if the given terms can never be convertible
     // (warn the user that something is off...)
-    return this.red.are_convertible(t1, t2);
+    const acc = [ [t1,t2] ];
+    while (acc.length > 0) {
+      const [u,v] = acc.pop();
+      if (equals(u,v)) { continue; }
+      const a = this.red.whnf(u);
+      const b = this.red.whnf(v);
+      if (a[c] === 'MVar') { assumptions.assumed_conv.push(a,b); continue; }
+      if (b[c] === 'MVar') { assumptions.assumed_conv.push(b,a); continue; }
+      if (a[c] !== b[c]) { continue; }
+      if (a[c] === "All") {
+        acc.push([a.dom,b.dom] , [a.cod,b.cod]);
+      } else if (a[c] === "Lam") {
+        acc.push([a.body,b.body]);
+      } else if (a[c] === "App") {
+        const [head_a, args_a] = get_head(a);
+        const [head_b, args_b] = get_head(b);
+        if (equals(head_a,head_b) && this.sig.is_injective(head_a)) {
+          if (args_a.length !== args_b.length) {
+            fail('LHS Conversion Check',
+              'Non unifiable terms: `'+pp_term(a)+"` and `"+pp_term(b)+"`.");
+          } else {
+            for (let i = 0; i < args_a.length; i++) {
+              acc.push([args_a[i],args_b[i]]);
+            }
+          }
+        }
+      }
+    }
   }
   
   // Check wether the term can be decided convertible using the assumptions
@@ -129,14 +130,16 @@ class RuleChecker {
   }
   
   // Note: should rather return a list of possible types
-  infer_mvar_type(assumptions, term, ctx) {
-    function get_mvar_type_from_assumption(assumption) {
-      if (assumption.name !== term.name) { return false; }
+  rhs_infer_mvar_type(assumptions, term, ctx) {
+    for (let k = 0; k < assumptions.assumed_types.length; k++) {
+      
+      const assumption = assumptions.assumed_types[k];
+      if (assumption.name !== term.name) { continue; }
       const arity = assumption.args.length;
       const ctx_size = assumption.ctx.length;
       // Build the variable substitution
       //   S = { assumption.args => term.args (shifted by position in assumption.ctx) }
-      const S = {};
+      const S = new Map();
       for(let i = 0; i < assumption.args.length; i++) {
         S[assumption.args[i]] = term.args[i];
       }
@@ -151,21 +154,23 @@ class RuleChecker {
       //   - u:A
       // Build assumption.type substituted with S and with the variable substitution (with substitute shifted)
       // Unshift it to ensure contains no remaining variable and return it
-      const unchecked = Array(ctx_size).fill(true);
-      while (true) {
-        // Find the first unchecked variable that is mapped to something in S
-        const i = unchecked.findIndex((t,i)=>t && S['!'+i]);
-        if (i<0) { break; } // if there are none, then the work is done: proceed
-        // else compute the expected type substituted with the partial substitution S
-        const type_of_ith = meta_subst(assumption.ctx[i],S);
-        // TODO : implement this check
-        // check(S['!'+i], type_of_ith);
-        unchecked[i] = false; // Never check this index again
-      }
-      const result = meta_subst(assumption.type,S);
-      return result;
+      try {
+        const unchecked = Array(ctx_size).fill(true);
+        while (true) {
+          // Find the first unchecked variable that is mapped to something in S
+          const i = unchecked.findIndex((t,i)=>t && S['!'+i]);
+          if (i < 0) { break; } // if there are none, then the work is done: proceed
+          // else compute the expected type substituted with the partial substitution S
+          const type_of_ith = meta_subst(assumption.ctx[i],S);
+          // TODO : better implement this check
+          this.rhs_check(assumptions, S['!'+i], type_of_ith);
+          unchecked[i] = false; // Never check this index again
+        }
+        return meta_subst(assumption.type,S);
+      } catch (e) { throw e; }
     }
-    return this.assumed_types.find(get_mvar_type_from_assumption);
+    fail("RHS Infer","Cannot infer the type of meta-variable instance `" +
+      pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
   }
   
   
@@ -231,18 +236,12 @@ class RuleChecker {
       this.assume_mvar_type(assumptions, term, expected_type, ctx);
     } else {
       const type = this.red.whnf(expected_type);
-      if (type[c] === "All" && term[c] === "Lam" && !term.type) {
+      if (type[c] === "All" && term[c] === "Lam") {
+        if (!term.type.star) { fail("LHS Check", "Please avoid type annotations in LHS..."); }
         this.lhs_infer(assumptions, type, ctx);
         this.lhs_check(assumptions, term.body, type.cod, extend(ctx, [type.name, type.dom]) );
       } else {
-        const term_t = this.lhs_infer(assumptions, term, ctx);
-        const ok = this.assume_convertible(assumptions, type, term_t);
-        if (!ok) {
-          fail("LHS Check", "Type mismatch on `"+pp_term(term, ctx)+"`.\n"+
-            "- Expect = "+pp_term(type  , ctx)+"\n"+
-            "- Actual = "+pp_term(term_t, ctx)+"\n"+
-            pp_context(ctx));
-        }
+        this.assume_convertible(assumptions, type, this.lhs_infer(assumptions, term, ctx));
       }
     }
   }
@@ -264,17 +263,17 @@ class RuleChecker {
         const cod_sort = this.red.whnf( this.rhs_infer(assumptions, term.cod, extend(ctx, [term.name, term.dom])) );
         if (dom_sort[c] != "Typ") {
           fail("RHS Infer","Domain of forall is not a type: `" +
-            pp_term(term, ctx) + "`.\n" + pp_context(ctx));
+            pp_term(term, ctx) + "`.\n" + pp_context(ctx)+ assumptions.pp());
         }
         if (cod_sort[c] != "Typ" && cod_sort[c] != "Knd") {
           fail("RHS Infer","Codomain of forall is neither a type nor a kind: `" +
-            pp_term(term, ctx) + "`.\n" + pp_context(ctx));
+            pp_term(term, ctx) + "`.\n" + pp_context(ctx)+ assumptions.pp());
         }
         return cod_sort;
       case "Lam":
         if (term.type === null) {
           fail("Infer","Can't infer non-annotated lambda `" +
-            pp_term(term,ctx) + "`.\n" + pp_context(ctx));
+            pp_term(term,ctx) + "`.\n" + pp_context(ctx)+ assumptions.pp());
         } else {
           const body_t = this.rhs_infer(assumptions, term.body, extend(ctx, [term.name, term.type]));
           const term_t = All(term.name, term.type, body_t);
@@ -293,33 +292,38 @@ class RuleChecker {
       case "Var":
         const ctxt_type = get_term(ctx, term.index);
         if(!ctxt_type) {
-          fail("RHS Infer","Cannot infer the type of free variable " +
-            pp_term(term, ctx));
+          fail("RHS Infer","Cannot infer the type of free variable `" +
+            pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
         }
         return ctxt_type;
-      case "MVar": return this.infer_mvar_type(assumptions, term, ctx);
+      case "MVar": return this.rhs_infer_mvar_type(assumptions, term, ctx);
       default:
         fail("RHS Infer","Unable to infer type of `" +
-          pp_term(term, ctx) + "`.\n" + pp_context(ctx));
+          pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
     }
   }
   
   // Check the type of a RHS meta-term assuming the given assumptions
   // (that were inferred from typing the LHS)
   rhs_check(assumptions, term, expected_type, ctx=Ctx()) {
-    // console.log("CheckWithAssumption",rhs[c],rhs, pp_term(rhs,ctx));
+    // console.log("CheckWithAssumption",pp_term(term,ctx), pp_term(expected_type,ctx));
     const type = this.whnf(assumptions, expected_type);
-    if (type[c] == "All" && term[c] == "Lam" && !term.type) {
+    if (type[c] == "All" && term[c] == "Lam") {
+      if (!term.type.star && !this.are_convertible(assumptions, term.type, type.dom)) {
+        fail("RHS Check", "Incompatible annotation `"+pp_term(term, ctx)+"`."+
+          "- Expect = " + pp_term(type.dom, ctx)+"\n"+
+          "- Actual = " + pp_term(term.type, ctx)+"\n"+
+          pp_context(ctx) + assumptions.pp());
+      }
       this.rhs_infer(assumptions, type, ctx);
       this.rhs_check(assumptions, term.body, type.cod, extend(ctx, [type.name, type.dom]));
     } else {
       const term_t = this.rhs_infer(assumptions, term, ctx);
-      if (!this.are_convertible(assumptions,type, term_t)) {
+      if (!this.are_convertible(assumptions, type, term_t)) {
         fail("RHS Check", "Type mismatch on `"+pp_term(term, ctx)+"`.\n"+
           "- Expect = " + pp_term(type  , ctx)+"\n"+
           "- Actual = " + pp_term(term_t, ctx)+"\n"+
-          pp_context(ctx)+
-          assumptions.pp());
+          pp_context(ctx) + assumptions.pp());
       }
     }
   }

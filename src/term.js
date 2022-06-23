@@ -33,15 +33,15 @@ function PreScope(name) { return {[c]:'PreScope', name}; }
 function PreRef(name)   { return {[c]:'PreRef', name}; }
 
 // Instructions
-function Decl(name,params,type)       { return {[c]:'Decl'     , name,type          }; }
-function Def(name,params,type,def)    { return {[c]:'Def'      , name,type,def      }; }
-function Rew(lhs,rhs,name,check=true) { return {[c]:'Rew'      , lhs,rhs,name,check }; }
-function CmdReq(module)               { return {[c]:'Req'      , module             }; }
-function CmdEval(ctx,term)            { return {[c]:'Eval'     , ctx,term           }; }
-function CmdInfer(ctx,term)           { return {[c]:'Infer'    , ctx,term           }; }
-function CmdCheckType(ctx,term,type)  { return {[c]:'CheckType', ctx,term,type      }; }
-function CmdCheckConv(ctx,lhs,rhs)    { return {[c]:'CheckConv', ctx,lhs,rhs        }; }
-function CmdPrint(term)               { return {[c]:'Print'    , term               }; }
+function Decl(ln,name,params,type)       { return {[c]:'Decl'     , ln, name,type          }; }
+function Def(ln,name,params,type,def)    { return {[c]:'Def'      , ln, name,type,def      }; }
+function Rew(ln,lhs,rhs,name,check=true) { return {[c]:'Rew'      , ln, lhs,rhs,name,check }; }
+function CmdReq(ln,module)               { return {[c]:'Req'      , ln, module             }; }
+function CmdEval(ln,ctx,term)            { return {[c]:'Eval'     , ln, ctx,term           }; }
+function CmdInfer(ln,ctx,term)           { return {[c]:'Infer'    , ln, ctx,term           }; }
+function CmdCheckType(ln,ctx,term,type)  { return {[c]:'CheckType', ln, ctx,term,type      }; }
+function CmdCheckConv(ln,ctx,lhs,rhs)    { return {[c]:'CheckConv', ln, ctx,lhs,rhs        }; }
+function CmdPrint(ln,term)               { return {[c]:'Print'    , ln, term               }; }
 
 // Shifts variables deeper than [depth] by [inc] in the term [term]
 function shift(term, inc=1, depth=0) {
