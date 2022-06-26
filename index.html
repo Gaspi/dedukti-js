@@ -15,7 +15,7 @@
 
 <div class="container-fluid main-wrapper">
   <div class="row justify-content-left">
-    <div class="col justify-content-center vh-100 d-flex flex-column" style="background: #f2f2f2;">
+    <div class="col justify-content-center vh-100 d-flex flex-column" style="max-width:700px; background: #f2f2f2;">
       <div class="mx-2">
         <button type="button" class="btn btn-primary btn-lg my-2 w-100" onclick="process_all_instructions()">
           Type Check !
@@ -26,10 +26,13 @@
           </button>
           <ul class="dropdown-menu w-100" aria-labelledby="dropdown_examples">
             <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">intro.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">intro-advanced.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO-cons.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO-rew.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO-nat.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">intro_advanced.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO_cons.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO_rew.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO_thm.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO_nat.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">church.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">nat_compute.dk</a></li>
             <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">arities.dk</a></li>
             <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">arities2.dk</a></li>
             <li><hr class="dropdown-divider"></li>
@@ -73,7 +76,6 @@
 // Global variables for easy access
 var code, instructions, sig;
 var editor, highlighter, jar;
-var debug = true;
 
 // Example loading
 function load_example(filename) {
@@ -171,6 +173,22 @@ function parse(code) {
   return parser.results[0];
 }
 
+function load(name) {
+  let res;
+  let xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+       // Typical action to be performed when the document is ready:
+       res = xhttp.responseText;
+    }
+  };
+  // Synchronous request
+  xhttp.open("GET", "examples/"+name+".dk", false);
+  xhttp.send();
+  if (!res) { fail("Load","Failed to load file `examples/"+name+".dk`."); }
+  return parse(res);
+}
+
 // Main processing loop
 function process_all_instructions() {
   clear_logs();
@@ -181,7 +199,7 @@ function process_all_instructions() {
     // Reseting the signature
     sig = new Signature();
     // Checking each instructions with the signature
-    instructions.forEach((ins) => sig.check_instruction(ins,log));
+    sig.check_instructions(instructions,log,load);
     log('ok',null,"File Checking","All done !");
   } catch(e) {
     log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");

@@ -85,16 +85,10 @@ class Signature {
     this.env.add_new_symbol(ins.name,ins.type);
   }
   
-  is_injective(term) {
-    return term[c] === 'Var' || term[c] === 'MVar' ||
-      (term[c] === 'Ref' && this.env.is_frozen(term.name)) // TODO implement injective symbols
-  }
-  
-  
   // Process a single unscoped instruction
-  check_instruction(ins,log) {
+  check_instruction(ins,log=console.log,load=null,namespace="") {
     try {
-      this.env.scope_instruction(ins);
+      this.env.scope_instruction(ins, namespace);
       switch (ins[c]) {
         case "Decl":
           this.declare_symbol(ins);
@@ -121,8 +115,6 @@ class Signature {
         case "Rew":
           this.rulechecker.declare_rule(ins);
           log('ok',ins.ln,"Rewrite rule added",pp_term(ins.lhs)+ " --\> " + pp_term(ins.rhs));
-          break;
-        case "Req":
           break;
         case "Eval":
           log('info',ins.ln,"Eval",pp_term(this.red.nf(ins.term, ins.ctx), ins.ctx)+"\n"+pp_context(ins.ctx));
@@ -152,10 +144,19 @@ class Signature {
           }
           break;
         case "Print":
-          log('info',ins.ln,"Show",pp_term(ins.term));
+          log('info',ins.ln,'Show',pp_term(ins.term));
           break;
         case "DTree":
-          log('info',ins.ln,"DTree","Decision tree for symbol `"+ins.name+"`:\n"+pp_dtrees(this.red.get(ins.name).decision_trees));
+          log('info',ins.ln,'DTree',"Decision tree for symbol `"+ins.name+"`:\n"+pp_dtrees(this.red.get(ins.name).decision_trees));
+          break;
+        case "Req":
+          if (!load) { fail('Require',"Current setup does not support `#REQUIRE`."); }
+          this.check_instructions(
+            load(ins.module),
+            (status,ln,title,msg) =>log(status,ins.ln,title,"While loading module `"+ins.module+"`, "+msg),
+            load,
+            ins.alias ? ins.alias+(namespace&&'.')+namespace : namespace
+          );
           break;
         default:
           fail("Instruction","Unexepected instruction constructor:"+ins[c]);
@@ -164,5 +165,12 @@ class Signature {
       e.ln = ins.ln;
       throw e;
     }
+  }
+  
+  check_instructions(instructions,log=console.log,load=null,namespace="") {
+    if (!Array.isArray(instructions)) {
+      fail("Instruction","Unexepected set of instructions. The checker is not used properly...");
+    }
+    instructions.forEach((ins) => this.check_instruction(ins,log,load,namespace));
   }
 }

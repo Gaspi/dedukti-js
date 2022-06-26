@@ -1,0 +1,40 @@
+T : Type;
+E : T -> Type;
+
+arr : T -> T -> T;
+: E (arr a b) --> E a -> E b;
+
+Num : Type := a:T -> (E a -> E a) -> (E a -> E a);
+
+zero  : Num := a:T => f : (E a -> E a) => x : E a => x;
+one   : Num := a:T => f : (E a -> E a) => f;
+two   : Num := a:T => f : (E a -> E a) => x : E a => f (f x);
+three : Num := a:T => f : (E a -> E a) => x : E a => f (f (f x));
+
+plus (m:Num) (n:Num) : Num := a:T =>
+  f : (E a -> E a) => x : E a => m a f (n a f x);
+
+times (m:Num) (n:Num) : Num := a:T =>
+  f : (E a -> E a) => x : E a => m a (n a f) x;
+
+power (m:Num) (n:Num) : Num := a:T =>
+  n (arr a a) (m a);
+
+four : Num := plus two two;
+five : Num := plus two three;
+
+
+// Pretty printing
+nat : T;
+N : Type := E nat;
+z : N;
+s : N -> N;
+pp (n:Num) : N := n nat s z;
+#EVAL pp (times four five);
+
+// Heavy computation
+#CHECK
+  power two (times four five)
+  ==
+  power two (times five four);
+

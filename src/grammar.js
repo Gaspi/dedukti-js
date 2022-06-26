@@ -54,7 +54,7 @@ const lexer = makeLexer({
     CMD_PRINT:"#PRINT",
     CMD_DTREE:"#DTREE",
     DB_INDEX:/\#[0-9]+/,
-    QID: /(?:[a-zA-Z0-9_\-!?']+\.)+[a-zA-Z0-9_\-!?']+/,
+    QID: /(?:[a-zA-Z0-9_!?']+\.)+[a-zA-Z0-9_!?']+/,
     ID: /[a-zA-Z0-9_!?']+/,
   }, ['_','COMMENT']);
 
@@ -83,7 +83,7 @@ var grammar = {
     {"name": "line", "symbols": ["line$ebnf$5", (lexer.has("COLON") ? {type: "COLON"} : COLON), "term", (lexer.has("LONGFATARROW") ? {type: "LONGFATARROW"} : LONGFATARROW), "term", (lexer.has("END") ? {type: "END"} : END)], "postprocess": ([id,c,lhs,,rhs     ,e]) => Rew(e.line,lhs,rhs,id?id.value:'unnamed'+c.line,false)},
     {"name": "line$ebnf$6", "symbols": ["alias"], "postprocess": id},
     {"name": "line$ebnf$6", "symbols": [], "postprocess": function(d) {return null;}},
-    {"name": "line", "symbols": [(lexer.has("CMD_REQ") ? {type: "CMD_REQ"} : CMD_REQ), (lexer.has("ID") ? {type: "ID"} : ID), "line$ebnf$6", (lexer.has("END") ? {type: "END"} : END)], "postprocess": ([,id,alias         ,e]) => CmdReq(e.line,id,alias)},
+    {"name": "line", "symbols": [(lexer.has("CMD_REQ") ? {type: "CMD_REQ"} : CMD_REQ), (lexer.has("ID") ? {type: "ID"} : ID), "line$ebnf$6", (lexer.has("END") ? {type: "END"} : END)], "postprocess": ([,id,alias         ,e]) => CmdReq(e.line,id.value,alias)},
     {"name": "line", "symbols": [(lexer.has("CMD_EVAL") ? {type: "CMD_EVAL"} : CMD_EVAL), "ctxt", "term", (lexer.has("END") ? {type: "END"} : END)], "postprocess": ([,c,t              ,e]) => CmdEval(e.line,c,t)},
     {"name": "line", "symbols": [(lexer.has("CMD_INFER") ? {type: "CMD_INFER"} : CMD_INFER), "ctxt", "term", (lexer.has("END") ? {type: "END"} : END)], "postprocess": ([,c,t              ,e]) => CmdInfer(e.line,c,t)},
     {"name": "line", "symbols": [(lexer.has("CMD_CHECK") ? {type: "CMD_CHECK"} : CMD_CHECK), "ctxt", "aterm", (lexer.has("COLON") ? {type: "COLON"} : COLON), "term", (lexer.has("END") ? {type: "END"} : END)], "postprocess": ([,c,t,,ty          ,e]) => CmdCheckType(e.line,c,t,ty)},

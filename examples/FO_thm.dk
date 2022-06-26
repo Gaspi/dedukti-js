@@ -1,0 +1,84 @@
+// Proofs of equivalence of
+//   Law of Excluded Middle
+//   Double Negation Elimination
+//   Peirce Law
+
+// We rely on FO logic encoded with rewriting
+#REQUIRE FO_rew;
+
+// Encoded proposition families
+prop_lem    (A:P)       : P := or A (not A);
+prop_dne    (A:P)       : P := imp (not (not A)) A;
+prop_peirce (A:P) (B:P) : P := imp (imp (imp A B) A) A;
+
+// Propositions in Dedukti's logic (Types)
+lem    : Type := A:P        -> Pr (prop_lem    A  );
+dne    : Type := A:P        -> Pr (prop_dne    A  );
+peirce : Type := A:P -> B:P -> Pr (prop_peirce A B);
+
+// Our target theorems to prove in Dedukti's logic
+   lem_imp_dne    : Type := lem    -> dne;
+peirce_imp_dne    : Type := peirce -> dne;
+   dne_imp_lem    : Type := dne    -> lem;
+   lem_imp_peirce : Type := lem    -> peirce;
+peirce_imp_lem    : Type := peirce -> lem;
+
+
+//////////////////////////////////////////////////////
+/////////     Proofs of the above theorems     ///////
+//////////////////////////////////////////////////////
+
+lem_imp_dne_prf : lem_imp_dne :=
+  lem_prf : (A : P -> Pr (prop_lem A)) =>
+  A : P =>
+  p : Pr (not (not A)) =>
+  (lem_prf A) A (x : Pr A => x)
+        (y : Pr (not A) => (p y) A)
+;
+
+peirce_imp_dne_prf : peirce_imp_dne :=
+  peirce_prf : (A : P -> B : P -> Pr (prop_peirce A B)) =>
+  A : P =>
+  p : Pr (not (not A)) =>
+  peirce_prf A false
+       (q: Pr (not A) =>
+        (p q) A)
+;
+
+dne_imp_lem_prf : dne_imp_lem :=
+  dne_prf : (A : P -> Pr (prop_dne A)) =>
+  A : P =>
+  dne_prf (prop_lem A)
+      (p : Pr (not (prop_lem A)) =>
+       p (or_intro_2 A (not A)
+         (q : Pr A => p (or_intro_1 A (not A) q))
+       )
+      )
+;
+
+lem_imp_peirce_prf : lem_imp_peirce :=
+  lem_prf : (A : P -> Pr (prop_lem A))  =>
+  A : P =>
+  B : P =>
+    (lem_prf A)
+    (prop_peirce A B)
+    (x : Pr A => f : (((Pr A) -> Pr B) -> Pr A) => x)
+    (
+      f : ((Pr A) -> P : P -> Pr P) =>
+      g : (((Pr A) -> Pr B) -> Pr A) =>
+      g (x : Pr A => f x B)
+  )
+;
+
+peirce_imp_lem_prf : peirce_imp_lem :=
+  peirce_prf : (A : P -> B : P -> Pr (prop_peirce A B)) =>
+  A : P =>
+    peirce_prf
+    (prop_lem A)
+    false
+    (
+      p : Pr (not (prop_lem A)) =>
+      or_intro_2 A (not A)
+      (q : Pr A => p (or_intro_1 A (not A) q))
+    )
+;

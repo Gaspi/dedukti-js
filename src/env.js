@@ -39,49 +39,53 @@ class Environment {
     t.type = type;
   }
   
-  scope_instruction(ins) {
-    if (ins.ctx ) { ins.ctx  = this.scope_ctx(ins.ctx); }
-    if (ins.term) { ins.term = this.scope(ins.term, ins.ctx); }
-    if (ins.type) { ins.type = this.scope(ins.type, ins.ctx); }
-    if (ins.def ) { ins.def  = this.scope(ins.def , ins.ctx); }
-    if (ins.lhs ) { ins.lhs  = this.scope(ins.lhs , ins.ctx); }
-    if (ins.rhs ) { ins.rhs  = this.scope(ins.rhs , ins.ctx); }
+  scope_instruction(ins, namespace='') {
+    if (ins.ctx ) { ins.ctx  = this.scope_ctx(      ins.ctx, namespace); }
+    if (ins.term) { ins.term = this.scope(ins.term, ins.ctx, namespace); }
+    if (ins.type) { ins.type = this.scope(ins.type, ins.ctx, namespace); }
+    if (ins.def ) { ins.def  = this.scope(ins.def , ins.ctx, namespace); }
+    if (ins.lhs ) { ins.lhs  = this.scope(ins.lhs , ins.ctx, namespace); }
+    if (ins.rhs ) { ins.rhs  = this.scope(ins.rhs , ins.ctx, namespace); }
+    if (namespace) {
+      if (ins.name ) { ins.name   = namespace+'.'+ins.name ; }
+      if (ins.alias) { ins.alias  = namespace+'.'+ins.alias; }
+    }
   }
   
-  // Scoping of (meta-)term and instructions, potentially in place.
-  scope_ctx(ctx) {
+  // Scoping of context, potentially in place.
+  scope_ctx(ctx, namespace='') {
     let res = Ctx();
     for (let i = 0; i < ctx.length; i++) {
-      res = extend(res, [ ctx[i][0], this.scope(ctx[i][1],res)]);
+      res = extend(res, [ ctx[i][0], this.scope(ctx[i][1],res,namespace)]);
     }
     return res;
   }
-  // Scoping of (meta-)term and instructions, potentially in place.
-  scope(e, ctx=Ctx()) {
+  // Scoping of (meta-)terms and instructions, potentially in place.
+  scope(e, ctx=Ctx(), namespace='') {
     if (!e) { return e; }
     switch (e[c]) {
       // Variable, meta-variable or symbol to scope
       case "PreScope":
         const ind = index_of(ctx,e.name);
         if (ind != null) { return Var(ind, e.name); }
-        const s = this.get(e.name);
+        const s = this.get(namespace+(namespace&&".")+e.name);
         if (s) { return Ref(s.fullname); }
         return MVar(e.name,[]);
       // (Meta-)term constructors
         break;
       case "PreRef": // Previously defined or loaded reference to locate in the environment
-        return Ref(this.do_get(e.name).fullname);
+        return Ref(this.do_get(namespace+(namespace&&".")+e.name).fullname);
       case "All":
-        e.dom = this.scope(e.dom, ctx);
-        e.cod = this.scope(e.cod, extend(ctx, [e.name,null]));
+        e.dom = this.scope(e.dom, ctx, namespace);
+        e.cod = this.scope(e.cod, extend(ctx, [e.name,null]), namespace);
         break;
       case "Lam":
-        e.type = this.scope(e.type, ctx);
-        e.body = this.scope(e.body, extend(ctx, [e.name,null]));
+        e.type = this.scope(e.type, ctx, namespace);
+        e.body = this.scope(e.body, extend(ctx, [e.name,null]), namespace);
         break;
       case "App":
-        e.func = this.scope(e.func, ctx);
-        e.argm = this.scope(e.argm, ctx);
+        e.func = this.scope(e.func, ctx, namespace);
+        e.argm = this.scope(e.argm, ctx, namespace);
         break;
       case "MVar":
         if (e.star) {
@@ -89,7 +93,7 @@ class Environment {
           e.args = [...Array( ctx_size(ctx) ).keys()].map(Var);
         } else {
           for (let i = 0; i < e.args.length; i++) {
-            e.args[i] = this.scope(e.args[i],ctx);
+            e.args[i] = this.scope(e.args[i],ctx, namespace);
           }
         }
         break;

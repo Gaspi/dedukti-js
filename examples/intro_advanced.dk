@@ -77,21 +77,17 @@ f (t:Ty) (x:T t) : T (arr t t):= lam t t (z => x);
 // Note : please don't do anything serious that relies on this feature...
 : dummy ==> z;
 
-// [Not Implemented Yet]
 // Import modules with the `#REQUIRE` command.
 // This is equivalent to the module being copied/pasted here
-#REQUIRE my_module;
+// #REQUIRE my_module;
 
-// [Not Implemented Yet]
 // An alias can be provided to prefixe imported symbol with a namespace
-#REQUIRE my_module[new_name];
+// #REQUIRE intro[intro];
 // Symbols in this module can be referred with `new_name.smb`.
-
 
 
 // My own TODO:
 // - Move "Output" to a dedicated tab
-// - Add a status (green ticks / yellow warn / blue ? / red X) to each line
 // - Add a list of imports in the left pane
 //   > can be filled with load button
 //   > entries can be removed
