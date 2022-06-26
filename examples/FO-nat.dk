@@ -1,0 +1,51 @@
+// Definition of first-order logic using rewriting
+
+Set : Type;        // Type of sets
+El  : Set -> Type; // Type of set elements
+P   : Type;        // Type of propositions
+Pr  : P -> Type;   // Type of proofs
+
+// Proposition constructors
+true : P;
+false : P;
+not : P -> P;
+and : P -> P -> P;
+or  : P -> P -> P;
+imp : P -> P -> P;
+equiv (A:P) (B:P) : P := and (imp A B) (imp B A);
+
+forall (s:Set) : (El s -> P) -> P;
+exists (s:Set) : (El s -> P) -> P;
+
+equals (s:Set) : El s -> El s -> P;
+
+tt : Pr true;  // `true` is a provable proposition
+
+// Definition of proof types
+: Pr false           --> C:P -> Pr C; // `false` is a proposition implying all others
+: Pr (not A)         --> Pr A -> Pr false;
+: Pr (and A B)       --> C:P -> (Pr A -> Pr B -> Pr C) -> Pr C;
+: Pr (or  A B)       --> C:P -> (Pr A -> Pr C) -> (Pr B -> Pr C) -> Pr C;
+: Pr (imp A B)       --> Pr A -> Pr B;
+: Pr (forall s pred) --> x:El s -> Pr (pred x);
+: Pr (exists s pred) --> C:P -> (x:El s -> Pr (pred x) -> Pr C) -> Pr C;
+: Pr (equals s x y)  --> pred:(El s -> P) -> Pr (pred x) -> Pr (pred y);
+
+///////////////////////////////////////////////////////////////////////////////
+////////////////////      Natural numbers              ////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+nat : Set;
+Nat : Type := El nat;
+0 : Nat;
+S : Nat -> Nat;
+
+nat_ind :
+  pred : (Nat -> P) ->
+  Pr (pred 0) ->
+  (n:Nat -> Pr (imp (pred n) (pred (S n)))) ->
+  n:Nat -> Pr (pred n);
+
+add : Nat -> Nat  -> Nat;
+: add 0 x --> x;
+: add (S x) y --> S (add x y);

@@ -1,0 +1,117 @@
+// Usual deep definition of first-order logic
+
+T : Type;       // Type of terms
+P : Type;       // Type of propositions
+Pr : P -> Type; // Type of proofs
+
+// Proposition constructors
+true : P;
+false : P;
+and : P -> P -> P;
+or  : P -> P -> P;
+imp : P -> P -> P;
+
+forall: (T -> P) -> P;
+exists: (T -> P) -> P;
+
+equals: T -> T -> P;
+
+not (a:P) : P := imp a false;
+equiv (A:P) (B:P) : P := and (imp A B) (imp B A);
+
+
+// Proof constructors and destructors
+
+tt : Pr true;  // `true` is a provable proposition
+
+imp_elim  (A:P) (B:P) : Pr (imp A B) -> (Pr A -> Pr B);
+imp_intro (A:P) (B:P) : (Pr A -> Pr B) -> Pr (imp A B);
+
+ex_falso (A:P) : Pr false -> Pr A;
+
+and_cons  (A:P) (B:P) : Pr A -> Pr B -> Pr (and A B);
+and_left  (A:P) (B:P) : Pr (and A B) -> Pr A;
+and_right (A:P) (B:P) : Pr (and A B) -> Pr B;
+
+or_left  (A:P) (B:P) : Pr A -> Pr (or A B);
+or_right (A:P) (B:P) : Pr B -> Pr (or A B);
+or_elim  (A:P) (B:P) : Pr (or A B) -> C:P -> Pr (imp A C) -> Pr (imp B C) -> Pr C;
+
+forall_intro (pred:(T->P)) : (t:T -> Pr (pred t)) -> Pr (forall pred);
+forall_elim  (pred:(T->P)) : Pr (forall pred) -> (t:T -> Pr (pred t));
+
+exists_intro (pred:(T->P)) : t:T -> Pr (pred t) -> Pr (exists pred);
+exists_elim  (pred:(T->P)) : Pr (exists pred) -> A:P -> Pr (forall (x => imp (pred x) A)) -> Pr A;
+
+eq_refl (x:T) : Pr (equals x x);
+eq_elim (pred:(T->P)) (x:T) (y:T) : Pr (equals x y) -> Pr (pred x) -> Pr (pred y);
+
+
+//////////////////////////////
+////////   Equality   ////////
+//////////////////////////////
+
+eq_sym : Pr (forall (x:T => forall (y:T => (imp (equals x y) (equals y x)))) )
+  :=
+    forall_intro
+      (x:T => forall (y:T => (imp (equals x y) (equals y x))))
+      (x:T =>
+    forall_intro 
+      (y:T => (imp (equals x y) (equals y x)))
+      (y:T =>
+    imp_intro (equals x y) (equals y x) (p:Pr (equals x y) => 
+    eq_elim (z => equals z x) x y p  (eq_refl x)
+    )));
+
+eq_trans:
+  Pr (forall (x:T =>
+      forall (y:T =>
+      forall (z:T =>
+        imp (and (equals x y) (equals y z)) (equals x z)
+      ))))
+  :=
+    forall_intro
+      (x:T => forall (y:T => forall (z:T => imp (and (equals x y) (equals y z)) (equals x z) )))
+      (x:T =>
+    forall_intro
+      (y:T => forall (z:T => imp (and (equals x y) (equals y z)) (equals x z) ))
+      (y:T =>
+    forall_intro
+      (z:T => imp (and (equals x y) (equals y z)) (equals x z))
+      (z:T =>
+    imp_intro (and (equals x y) (equals y z)) (equals x z)
+      (p:Pr (and (equals x y) (equals y z)) =>
+      eq_elim (v => equals x v) y z
+        (and_right (equals x y) (equals y z) p)
+        (and_left (equals x y) (equals y z) p)
+      ))));
+
+
+//////////////////////////////
+////   De Morgan's laws   ////
+//////////////////////////////
+
+morgan_2 (A:P) (B:P) : Pr (imp (or (not A) (not B)) (not (and A B)))
+  :=
+    imp_intro (or (not A) (not B)) (not (and A B))
+     (p =>
+    imp_intro (and A B) false
+     (p2 : Pr (and A B) =>
+    or_elim (not A) (not B) p false
+      (imp_intro (not A) false (p_not_a : Pr (not A) => imp_elim A false p_not_a (and_left  A B p2)))
+      (imp_intro (not B) false (p_not_b : Pr (not B) => imp_elim B false p_not_b (and_right A B p2)))
+    ))
+;
+
+morgan_3 (A:P) (B:P) : Pr (imp (not (or A B)) (and (not A) (not B)));
+// Try to define this
+
+morgan_4 (A:P) (B:P) : Pr (imp (and (not A) (not B)) (not (or A B)));
+// Try to define this
+
+morgan_1 (A:P) (B:P) : Pr (imp (not (and A B)) (or (not A) (not B)));
+// Try to define this if you can...
+
+
+ax (A:P) : Pr (imp (not (not A)) A);
+// Try to define morgan_1 now

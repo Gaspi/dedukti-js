@@ -7,32 +7,48 @@
   <link rel="shortcut icon" type="image/png" href="ressources/favicon.png"/>
   <!-- Leaflet and Bootstrap: CSS style -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/fontawesome.min.css">
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous"> -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
   <!-- Syntax coloring: CSS style -->
   <link rel="stylesheet" href="ressources/syntax_coloring.css">
 </head>
-<body>
+<body style="overflow:clip;">
 
-<div class="container-fluid">
-  <div class="row justify-content-center">
-    <div class="col-3 mx-3">
-      <h2>Examples</h2>
-      <ul id="examples">
-      </ul>
-      <h2>Ouput <button class="" onclick="process_all_instructions();">Type Check !</button> </h2>
-      <div class="mx-2" id="logs"></div>
-      </div>
-    <div class="col-6 mx-2">
-      <h2>Code</h2>
-      <div class="form-outline mx-3">
-        <div style="position: absolute; top: 0px; left: 0px; bottom: 0px; width: 35px; overflow: hidden; color: white; font-size: 16px; line-height: 24px; padding-top: 0px; padding-left: 0px;">
-          <div style="position: relative; top: 0px;">
-          1 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2 <br> 2
-          </div>
+<div class="container-fluid main-wrapper">
+  <div class="row justify-content-left">
+    <div class="col justify-content-center vh-100 d-flex flex-column" style="background: #f2f2f2;">
+      <div class="mx-2">
+        <button type="button" class="btn btn-primary btn-lg my-2 w-100" onclick="process_all_instructions()">
+          Type Check !
+        </button>
+        <div class="my-2 dropdown">
+          <button type="button" class="btn btn-success dropdown-toggle btn-lg w-100" id="dropdown_examples" data-bs-toggle="dropdown" aria-expanded="false">
+            Load an example
+          </button>
+          <ul class="dropdown-menu w-100" aria-labelledby="dropdown_examples">
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">intro.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">intro-advanced.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO-cons.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO-rew.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO-nat.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">arities.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">arities2.dk</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><input class="ml-2" type="file" id="file-input"></li>
+            <li><a class="dropdown-item" href="#" onclick="download_file()">Save current to disk</a></li>
+          </ul>
         </div>
-        <div id="editor" class="editor"></div>
+      </div>
+      <h2 class="text-center">Ouput</h2>
+      <div class="flex-fill overflow-auto" id="logs"></div>
+    </div>
+    <div class="col vh-100 d-flex flex-column">
+      <h2 class="text-center">Dedukti</h2>
+      <div id="editor-wrapper" class="mx-3 mt-2 flex-fill overflow-auto">
+        <div id="editor" class="editor" style="font-family:monospace"></div>
       </div>
     </div>
+  </div>
+</div>
 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
@@ -42,10 +58,9 @@
 <script src="src/env.js"></script>
 <script src="src/dtree.js"></script>
 <script src="src/red.js"></script>
-<script src="src/sig.js"></script>
-<script src="src/rulechecker.js"></script>
 <script src="src/pp.js"></script>
-<!--<script src="src/meta_context.js"></script> -->
+<script src="src/rulechecker.js"></script>
+<script src="src/sig.js"></script>
 
 <script src="ressources/moo.js"></script>
 <script src="src/grammar.js"></script>
@@ -60,133 +75,144 @@ var code, instructions, sig;
 var editor, highlighter, jar;
 var debug = true;
 
-// Example loader
+// Example loading
 function load_example(filename) {
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
-      if (this.readyState == 4 && this.status == 200) {
-         // Typical action to be performed when the document is ready:
-         jar.updateCode(xhttp.responseText);
-         process_all_instructions();
-      }
+    if (this.readyState == 4 && this.status == 200) {
+       // Typical action to be performed when the document is ready:
+       jar.updateCode(xhttp.responseText);
+       process_all_instructions();
+    }
   };
   xhttp.open("GET", "examples/"+filename, true);
   xhttp.send();
 }
 
+// File loading
+function load_file(file) {
+  if (!file) { return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    jar.updateCode(e.target.result);
+    process_all_instructions();
+  };
+  reader.readAsText(file);
+}
+
+// Editor content downloading
+function download_file() {
+  const file = new File([editor.textContent], "dedukti.dk")
+  // Create a link and set the URL using `createObjectURL`
+  const link = document.createElement("a");
+  link.style.display = "none";
+  link.href = URL.createObjectURL(file);
+  link.download = file.name;
+
+  // It needs to be added to the DOM so it can be clicked
+  document.body.appendChild(link);
+  link.click();
+
+  // To make this work on Firefox : wait a little while before removing it.
+  setTimeout(() => {
+    URL.revokeObjectURL(link.href);
+    link.parentNode.removeChild(link);
+  }, 0);
+}
+
 // Logs handling
 const logs = document.getElementById("logs");
 function clear_logs() { logs.innerHTML = ""; }
-function log_ok(title,msg)   { log(title,msg,['alert','alert-success']); }
-function log_info(title,msg) { log(title,msg,['alert','alert-info']); }
-function log_warn(title,msg) { log(title,msg,['alert','alert-warning']); }
-function log_err(err) {
-  if (err.title) {
-    log('ERROR: '+err.title, err.msg, ['alert','alert-danger']);
-  } else {
-    const msg = (err.msg || err)+"";
-    if (msg.startsWith("Syntax error ")) {
-      log('SYNTAX ERROR', msg.slice(13), ['alert','alert-danger']);
-    } else {
-      log('ERROR', err, ['alert','alert-danger']);
-    }
-  }
-}
-function log(title,msg,classes=[]) {
+// Display a new block in the loading area
+const editor_wrapper = document.getElementById('editor-wrapper');
+function log(status,ln,title,msg) {
   const div = document.createElement('div');
   div.style['white-space']= 'pre-wrap';
-  div.innerHTML = '<strong>['+title+']</strong> '+msg;
-  div.classList.add('p-1');
-  div.classList.add('m-2');
-  classes.forEach((x)=>div.classList.add(x));
+  div.innerHTML = (ln?ln+": ":"")+'<strong>['+title+']</strong> '+msg;
+  div.classList.add('p-1', 'm-2', 'alert');
+  const tag = {
+    ok  :'success',
+    info:'info',
+    warn:'warning',
+    err :'danger',
+    }[status];
+  div.classList.add('alert-'+tag);
   logs.appendChild(div);
+  if (ln>0) {
+    const hovering = div.cloneNode();
+    editor_wrapper.appendChild(hovering);
+    hovering.style.zIndex=100;
+    hovering.style.position = "absolute";
+    hovering.style.display = "none";
+    hovering.innerHTML = '<strong>['+title+']</strong> '+msg;
+    const l = document.getElementById('l'+ln);
+    l.classList.add('text-'+tag);
+    l.href="#"
+    l.onmouseover = function() {
+      hovering.style.width = parseInt(window.getComputedStyle(editor).getPropertyValue('width'))*0.8+"px";
+      const bounds = l.getBoundingClientRect();
+      hovering.style.display = 'block';
+      hovering.style.left = 58+"px";
+      hovering.style.top  = (bounds.top+11)+"px";
+    };
+    l.onmouseout = function() { hovering.style.display = 'none'; };
+    l.onclick = function() { div.scrollIntoView(); };
+  }
 }
 
 // Create a Parser object from our grammar.
 const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
 const initial_state = parser.save();
 
-// Converts a string to a series of instructions
+// Convert a string to a series of instructions
 function parse(code) {
   parser.restore(initial_state);
   parser.feed(code);
   return parser.results[0];
 }
 
-// Processes a single unscoped instruction
-function process_instruction(sig,rulechecker,ins) {
-  sig.env.scope_instruction(ins);
-  switch (ins[c]) {
-    case "Decl":
-      sig.declare_symbol(ins);
-      log_ok("Symbol declared",ins.name+" with type " +pp_term(ins.type) );
-      break;
-    case "Def":
-      sig.declare_symbol(ins);
-      rulechecker.declare_rule( Rew(ins.ln, Ref(ins.name),ins.def,ins.name+"_def") );
-      log_ok("Symbol defined",ins.name+ " as " + pp_term(ins.def));
-      break;
-    case "Rew":
-      rulechecker.declare_rule(ins);
-      log_ok("Rewrite rule added",pp_term(ins.lhs)+ " --\> " + pp_term(ins.rhs));
-      break;
-    case "Req":
-      break;
-    case "Eval":
-      log_info("Eval",pp_term(sig.red.nf(ins.term, ins.ctx))+"\n"+
-        pp_context(ins.ctx));
-      break;
-    case "Infer":
-      log_info("Infer",pp_term(sig.infer(ins.term, ins.ctx))+"\n"+
-        pp_context(ins.ctx));
-      break;
-    case "CheckType":
-      sig.check(ins.term, ins.type, ins.ctx);
-      log_ok("CheckType",
-        pp_term(ins.term, ins.ctx)+" has indeed type "+pp_term(ins.type, ins.ctx)+"\n"+
-        pp_context(ins.ctx));
-      break;
-    case "CheckConv":
-      if (sig.red.are_convertible(ins.lhs, ins.rhs)) {
-        log_ok("CheckConv",pp_term(ins.lhs,ins.ctx)+" is indeed convertible with "+pp_term(ins.rhs,ins.ctx));
-      } else {
-        log_warn("CheckConv",pp_term(ins.lhs,ins.ctx)+" is not convertible with "+pp_term(ins.rhs,ins.ctx));
-      }
-      break;
-    case "Print":
-      log_info("Show",pp_term(ins.term));
-      break;
-    default:
-      throw "Instruction:\nUnexepected instruction type:"+ins[c];
-  }
-}
-
 // Main processing loop
 function process_all_instructions() {
   clear_logs();
   try {
-    // Parsing of raw text code
-    code = editor.textContent;
-    instructions = parse(code);
-    log_ok("Parsing","done.");
+    // Parsing of input text code
+    let instructions = parse(editor.textContent);
+    log('ok',null,"Parsing","done.");
     // Reseting the signature
     sig = new Signature();
-    rulechecker = new RuleChecker(sig);
-    instructions.forEach((i)=>process_instruction(sig,rulechecker,i));
-    log_ok("All done !","");
+    // Checking each instructions with the signature
+    instructions.forEach((ins) => sig.check_instruction(ins,log));
+    log('ok',null,"File Checking","All done !");
   } catch(e) {
-    log_err(e);
-    if (debug) { throw e; }
+    log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");
   }
 }
 
+const dragenter = (e) => {
+  e.stopPropagation();
+  e.preventDefault();
+}
+const dragover = (e) => {
+  e.stopPropagation();
+  e.preventDefault();
+}
+const drop = (e) => {
+  e.stopPropagation();
+  e.preventDefault();
+  load_file(e.dataTransfer.files[0]);
+}
 
+// Only when page is loaded : load intro.dk and start syntax highlighting
 window.onload = function () {
-  editor = document.getElementById("editor");
+  load_example('intro.dk');
+  document.getElementById('file-input').onchange = (e)=>load_file(e.target.files[0]);
+  editor = document.getElementById('editor');
+  editor.addEventListener("dragenter", dragenter, false);
+  editor.addEventListener("dragover", dragover, false);
+  editor.addEventListener("drop", drop, false);
   highlighter = moo.compile({
       STRING:grammar.Lexer.groups.map(function (g) {
-        const ng = {};
-          Object.assign(ng, g); // Deep copy
+          const ng = Object.assign({}, g); // Deep copy
           ng.value = txt => '<span class="KW '+g.defaultType+'">'+txt+'</span>';
           return ng;
         }),
@@ -196,19 +222,7 @@ window.onload = function () {
     highlighter.reset(editor.textContent);
     editor.innerHTML = Array.from(highlighter).map(x=>x.value).join('');
   };
-  const gutter_options = {
-    color:'white',
-  }
-  jar = CodeJar(editor, withLineNumbers(highlight, options=gutter_options), {tab: ' '.repeat(4)});
-  ['intro.dk', 'demo.dk','arities.dk','arities2.dk'].forEach(function(name) {
-    const a  = document.createElement('a');
-    a.setAttribute('href', '#');
-    a.innerHTML = name;
-    a.onclick = function() { load_example(name); };
-    const li = document.createElement('li');
-    li.appendChild(a);
-    document.getElementById('examples').appendChild(li);
-  })
-  load_example('intro.dk');
+  jar = CodeJar(editor, withLineNumbers(highlight, options={ color:'black' }), {tab: ' '.repeat(4)});
 };
+
 </script>

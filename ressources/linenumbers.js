@@ -1,5 +1,5 @@
 function withLineNumbers(highlight, options = {}) {
-    const opts = Object.assign({ class: "codejar-linenumbers", wrapClass: "codejar-wrap", width: "35px", backgroundColor: "rgba(128, 128, 128, 0.15)", color: "" }, options);
+    const opts = Object.assign({ class: "codejar-linenumbers", wrapClass: "codejar-wrap", width: "35px", backgroundColor: "rgba(128, 128, 128, 0.15)", color: "black" }, options);
     let lineNumbers;
     return function (editor) {
         highlight(editor);
@@ -9,11 +9,14 @@ function withLineNumbers(highlight, options = {}) {
         }
         const code = editor.textContent || "";
         const linesCount = code.replace(/\n+$/, "\n").split("\n").length + 1;
-        let text = "";
+        lineNumbers.innerHTML="";
         for (let i = 1; i < linesCount; i++) {
-            text += `${i}\n`;
+            const st = document.createElement('a');
+            st.id=`l${i}`;
+            st.text=`${i}`;
+            lineNumbers.appendChild( st );
+            lineNumbers.appendChild( document.createElement('br') );
         }
-        lineNumbers.innerText = text;
     };
 }
 function init(editor, opts) {
@@ -33,10 +36,11 @@ function init(editor, opts) {
     gutter.style.overflow = "hidden";
     gutter.style.backgroundColor = opts.backgroundColor;
     gutter.style.color = opts.color || css.color;
-    gutter.style.setProperty("mix-blend-mode", "difference");
+    //gutter.style.setProperty("mix-blend-mode", "difference");
     // Copy editor styles
     gutter.style.fontFamily = css.fontFamily;
     gutter.style.fontSize = css.fontSize;
+    gutter.style.fontWeight = 'bold'; 
     gutter.style.lineHeight = css.lineHeight;
     gutter.style.paddingTop = css.paddingTop;
     gutter.style.paddingLeft = css.paddingLeft;

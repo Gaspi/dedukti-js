@@ -29,3 +29,4 @@ python3 -m http.server
 Download [codejar.js](https://medv.io/codejar/codejar.js) and [linenumbers.js](https://medv.io/codejar/linenumbers.js)
 
 Remove the `export` keywords.
+Edit `linenumbers.js`.

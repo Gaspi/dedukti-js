@@ -86,7 +86,7 @@ class Environment {
       case "MVar":
         if (e.star) {
           e.name = this.fresh_name();
-          e.args = [...Array( ctx_size(ctx) ).keys()].map(MVar);
+          e.args = [...Array( ctx_size(ctx) ).keys()].map(Var);
         } else {
           for (let i = 0; i < e.args.length; i++) {
             e.args[i] = this.scope(e.args[i],ctx);

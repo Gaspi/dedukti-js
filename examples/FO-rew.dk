@@ -1,0 +1,115 @@
+// Shallow definition of first-order logic using rewriting
+
+T : Type;       // Type of terms
+P : Type;       // Type of propositions
+Pr : P -> Type; // Type of proofs
+
+// Proposition constructors
+true : P;
+false : P;
+and : P -> P -> P;
+or  : P -> P -> P;
+imp : P -> P -> P;
+
+forall: (T -> P) -> P;
+exists: (T -> P) -> P;
+
+equals: T -> T -> P;
+
+not (a:P) : P := imp a false;
+equiv (A:P) (B:P) : P := and (imp A B) (imp B A);
+
+
+// Proof constructors and rewrite rules
+
+tt : Pr true;  // `true` is a provable proposition
+
+// Definition of proof types
+: Pr false         --> C:P -> Pr C; // `false` is a proposition implying all others
+: Pr (and A B)     --> C:P -> (Pr A -> Pr B -> Pr C) -> Pr C;
+: Pr (or  A B)     --> C:P -> (Pr A -> Pr C) -> (Pr B -> Pr C) -> Pr C;
+: Pr (imp A B)     --> Pr A -> Pr B;
+: Pr (forall pred) --> x:T -> Pr (pred x);
+: Pr (exists pred) --> C:P -> (x:T -> Pr (pred x) -> Pr C) -> Pr C;
+: Pr (equals x y)  --> pred:(T -> P) -> Pr (pred x) -> Pr (pred y);
+
+
+//////////////////////////////
+////////   Theorems   ////////
+//////////////////////////////
+
+// Implication
+imp_elim  (A:P) (B:P) :  Pr (imp A B)  -> Pr A -> Pr B := p => p;
+imp_intro (A:P) (B:P) : (Pr A -> Pr B) -> Pr (imp A B) := p => p;
+
+// Disjunction
+or_intro_1 (A:P) (B:P) : Pr A -> Pr (or A B) := p => C => f => g => f p;
+or_intro_2 (A:P) (B:P) : Pr B -> Pr (or A B) := p => C => f => g => g p;
+or_elim    (A:P) (B:P) : Pr (or A B) -> (C:P -> Pr (imp A C) -> Pr (imp B C) -> Pr C) := p => p;
+
+// Conjunction
+and_intro  (A:P) (B:P) : Pr A -> Pr B -> Pr (and A B) := a => b => C => f => f a b;
+and_elim_1 (A:P) (B:P) : Pr (and A B) -> Pr A         := p => p A (a => b => a);
+and_elim_2 (A:P) (B:P) : Pr (and A B) -> Pr B         := p => p B (a => b => b);
+
+// Universal quantificator
+forall_intro (pred:(T->P)) : (t:T -> Pr (pred t)) -> Pr (forall pred) := p => p;
+forall_elim  (pred:(T->P)) : Pr (forall pred) -> (t:T -> Pr (pred t)) := p => p;
+
+// Existential quantifiers
+exists_intro (pred:(T->P)) : t:T -> Pr (pred t) -> Pr (exists pred)
+  := t => p => A => f => f t p;
+exists_elim  (pred:(T->P)) : Pr (exists pred) -> A:P -> Pr (forall (x => imp (pred x) A)) -> Pr A
+  := p => p;
+
+
+//////////////////////////////
+////////   Equality   ////////
+//////////////////////////////
+
+eq_refl: Pr (forall (x:T => equals x x))
+  := x => pred => p => p;
+eq_sym : Pr (forall (x:T => forall (y:T => (imp (equals x y) (equals y x)))) )
+  := x => y => p => p (z => equals z x) (eq_refl x);
+
+eq_trans:
+  Pr (forall (x:T =>
+      forall (y:T =>
+      forall (z:T =>
+        imp (and (equals x y) (equals y z)) (equals x z)
+      ))))
+  :=
+    x:T =>
+    y:T =>
+    z:T =>
+    p:Pr (and (equals x y) (equals y z)) =>
+    pred:(T -> P) =>
+    q:Pr (pred x) =>
+    and_elim_2 (equals x y) (equals y z) p pred (and_elim_1 (equals x y) (equals y z) p pred q);
+
+
+//////////////////////////////
+////   De Morgan's laws   ////
+//////////////////////////////
+
+morgan_2 (a:P) (b:P) : Pr (imp (or (not a) (not b)) (not (and a b)))
+  :=
+    p1 : Pr (or (not a) (not b))  =>
+    p2 : Pr (and a b) =>
+    p1 false
+      (p_not_a : Pr (not a) => p2 false (pa => pb => p_not_a pa))
+      (p_not_b : Pr (not b) => p2 false (pa => pb => p_not_b pb))
+;
+
+morgan_3 (a:P) (b:P) : Pr (imp (not (or a b)) (and (not a) (not b)));
+// Try to define this
+
+morgan_4 (a:P) (b:P) : Pr (imp (and (not a) (not b)) (not (or a b)));
+// Try to define this
+
+morgan_1 (a:P) (b:P) : Pr (imp (not (and a b)) (or (not a) (not b)));
+// Try to define this if you can...
+
+
+ax (a:P) : Pr (imp (not (not a)) a);
+// Try to define morgan_1 now

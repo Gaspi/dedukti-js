@@ -1,0 +1,99 @@
+// Oh you want to know more ?
+// You'll find below more advanced features of this Dedukti type checker
+
+// Basics signature from intro.dk
+Nat : Type;
+z : Nat;
+s : Nat -> Nat;
+
+Ty: Type;
+arr: Ty -> Ty -> Ty;
+T: Ty -> Type;
+app: a:Ty -> b:Ty ->  T (arr a b) -> (T a -> T b);
+lam: a:Ty -> b:Ty -> (T a -> T b) ->  T (arr a b);
+
+// Dedukti supports non-linearity
+// We recommend to avoid this feature if possible as it quickly leads
+// to loss of confluence, product compatibility and subject reduction
+max: Nat -> Nat -> Nat;
+: max n n --> n;
+#CHECK x : Nat |- max x x     == x;
+#CHECK x : Nat |- max x (s x) != x;
+
+// Note that meta variable n[] is the same as n.
+min: Nat -> Nat -> Nat;
+: min n[] n --> n;
+#CHECK x : Nat |- min x x     == x;
+#CHECK x : Nat |- min x (s x) != x;
+
+
+// A meta-variable that is only applied to some (not all) of the
+// available locally bounded variable will only match expressions
+// that depend on the provided locally bounded variables
+constant : (Nat -> Nat) -> Nat;
+: constant (x => C) --> z;
+#CHECK            constant (x => z) == z;
+#CHECK            constant (x => x) != z;
+#CHECK a : Nat |- constant (x => a) == z;
+
+// Note: instances of nameless meta-variables `*` are always assumed
+// applied to all available locally bounded variables.
+dummy : (Nat -> Nat) -> Nat;
+: dummy (x => *) --> z;
+#CHECK            dummy (x => z) == z;
+#CHECK            dummy (x => x) == z;
+#CHECK a : Nat |- dummy (x => a) == z;
+
+// Parameters can be added to declared or defined symbols
+f (t:Ty) (x:T t) : T (arr t t):= lam t t (z => x);
+#EVAL f;
+#INFER f;
+
+#EVAL  a:Ty, z:T a |- f a z;
+#INFER a:Ty, z:T a |- f a z;
+
+// Symbols can be declared constant after their declaration
+// to better control when their injectivity is needed to typecheck rules
+#CONST s;
+
+
+// Symbols can also be declared "injective" with the `#INJECTIVE` command.
+// This forbids it to be *further* rewritten (it may already have rules).
+// Note that the injectivity is assumed (for now) and not checked.
+#INJECTIVE f;
+
+// The `#PRINT` command allows to print a term
+#PRINT constant (x => z);
+
+// The `#DTREE` allows to show the decision trees used to compute a symbol.
+// Decision trees are computed lazily (and erased eagerly).
+// Only the decision trees that were already needed will show.
+#DTREE dummy;
+
+// Tired of being told your rules are not type preserving ?
+// Just skip this check and add them with the unsafe rule definition `==>`.
+// > The rule must still be well-formed
+// > Injective or constant symbols may still not be rewritten
+// Note : please don't do anything serious that relies on this feature...
+: dummy ==> z;
+
+// [Not Implemented Yet]
+// Import modules with the `#REQUIRE` command.
+// This is equivalent to the module being copied/pasted here
+#REQUIRE my_module;
+
+// [Not Implemented Yet]
+// An alias can be provided to prefixe imported symbol with a namespace
+#REQUIRE my_module[new_name];
+// Symbols in this module can be referred with `new_name.smb`.
+
+
+
+// My own TODO:
+// - Move "Output" to a dedicated tab
+// - Add a status (green ticks / yellow warn / blue ? / red X) to each line
+// - Add a list of imports in the left pane
+//   > can be filled with load button
+//   > entries can be removed
+// - Add typechecking status to imports (only type checked can be imported)
+// - Add "typecheck all" button

@@ -1,35 +1,10 @@
 
-
-// DFS searches for a subterm of [term] satisfying the given predicate
-function find_subterm(predicate, term, ctx=Ctx()) {
-  if (!term) { return undefined; }
-  const here = predicate(term, ctx);
-  if (here) { return [term,ctx]; }
-  switch (term[c]) {
-    case "All":
-      return find_subterm(predicate, term.dom, ctx) ||
-             find_subterm(predicate, term.cod, extend(ctx, [term.name, term.dom]));
-    case "Lam":
-      return find_subterm(predicate, term.type, ctx) ||
-             find_subterm(predicate, term.body, extend(ctx, [term.name, term.type]));
-    case "App":
-      return find_subterm(predicate, term.func, ctx) ||
-             find_subterm(predicate, term.argm, ctx);
-    case "MVar":
-      return term.args.find(t=>find_subterm(predicate, t, ctx));
-    default: return undefined;
-  }
-}
-
-// A term is closed if no subterm can be found that is an out of scope variable.
-function is_closed(term) {
-  return !find_subterm((t,ctx)=>t[c]==='Var'&&t.index>=ctx_size(ctx), term);
-}
-
 class Signature {
+  
   constructor(env = new Environment(), red = new ReductionEngine()) {
     this.env = env;
     this.red = red;
+    this.rulechecker = new RuleChecker(env,red);
   }
   
   // Infers the type of a term
@@ -80,13 +55,15 @@ class Signature {
     if (term[c] == 'MVar') { fail("Check", "Cannot check the type of a meta-variable instance: "+pp_term(term, ctx)); }
     const type = this.red.whnf(expected_type);
     if (type[c] == "All" && term[c] == "Lam") {
-      if (!term.type.star && !this.red.are_convertible(term.type, type.dom)) {
+      this.infer(type, ctx);
+      if (term.type.star) {
+        term.type = type.dom;
+      } else if (!this.red.are_convertible(term.type, type.dom)) {
         fail("Check", "Incompatible annotation `"+pp_term(term, ctx)+"`."+
           "- Expect = " + pp_term(type.dom, ctx)+"\n"+
           "- Actual = " + pp_term(term.type, ctx)+"\n"+
           pp_context(ctx));
       }
-      this.infer(type, ctx);
       this.check(term.body, type.cod, extend(ctx, [type.name, type.dom]));
     } else {
       const term_t = this.infer(term, ctx);
@@ -109,7 +86,83 @@ class Signature {
   }
   
   is_injective(term) {
-    return term[c] === 'Var' ||
-      (term[c] === 'MVar' && false) // TODO implement injective symbols
+    return term[c] === 'Var' || term[c] === 'MVar' ||
+      (term[c] === 'Ref' && this.env.is_frozen(term.name)) // TODO implement injective symbols
+  }
+  
+  
+  // Process a single unscoped instruction
+  check_instruction(ins,log) {
+    try {
+      this.env.scope_instruction(ins);
+      switch (ins[c]) {
+        case "Decl":
+          this.declare_symbol(ins);
+          log('ok',ins.ln,"Symbol declared",ins.name+" with type " +pp_term(ins.type) );
+          break;
+        case "DeclConst":
+          this.declare_symbol(ins);
+          this.red.declare_constant(ins.name);
+          log('ok',ins.ln,"Constant symbol declared",ins.name+" with type " +pp_term(ins.type) );
+          break;
+        case "DeclConstP":
+          this.red.declare_constant(ins.name);
+          log('ok',ins.ln,"Symbol declared constant",ins.name);
+          break;
+        case "DeclInj":
+          this.red.declare_injective(ins.name);
+          log('ok',ins.ln,"Symbol declared injective",ins.name+" (no check)");
+          break;
+        case "Def":
+          this.declare_symbol(ins);
+          this.rulechecker.declare_rule( Rew(ins.ln, Ref(ins.name),ins.def,ins.name+"_def") );
+          log('ok',ins.ln,"Symbol defined",ins.name+ " as " + pp_term(ins.def));
+          break;
+        case "Rew":
+          this.rulechecker.declare_rule(ins);
+          log('ok',ins.ln,"Rewrite rule added",pp_term(ins.lhs)+ " --\> " + pp_term(ins.rhs));
+          break;
+        case "Req":
+          break;
+        case "Eval":
+          log('info',ins.ln,"Eval",pp_term(this.red.nf(ins.term, ins.ctx), ins.ctx)+"\n"+pp_context(ins.ctx));
+          break;
+        case "Infer":
+          log('info',ins.ln,"Infer",pp_term(this.infer(ins.term, ins.ctx), ins.ctx)+"\n"+pp_context(ins.ctx));
+          break;
+        case "CheckType":
+          this.check(ins.term, ins.type, ins.ctx);
+          log('ok',ins.ln,"CheckType",
+            pp_term(ins.term, ins.ctx)+" has indeed type "+pp_term(ins.type, ins.ctx)+"\n"+
+            pp_context(ins.ctx));
+          break;
+        case "CheckConv":
+          if (this.red.are_convertible(ins.lhs, ins.rhs)) {
+            if (ins.cv) {
+              log('ok',ins.ln,"CheckConv",pp_term(ins.lhs,ins.ctx)+" is indeed convertible with "+pp_term(ins.rhs,ins.ctx));
+            } else {
+              log('warn',ins.ln,"CheckConv",pp_term(ins.lhs,ins.ctx)+" is in fact convertible with "+pp_term(ins.rhs,ins.ctx));
+            }
+          } else {
+            if (ins.cv) {
+              log('warn',ins.ln,"CheckConv",pp_term(ins.lhs,ins.ctx)+" is in fact not convertible with "+pp_term(ins.rhs,ins.ctx));
+            } else {
+              log('ok',ins.ln,"CheckConv",pp_term(ins.lhs,ins.ctx)+" is indeed not convertible with "+pp_term(ins.rhs,ins.ctx));
+            }
+          }
+          break;
+        case "Print":
+          log('info',ins.ln,"Show",pp_term(ins.term));
+          break;
+        case "DTree":
+          log('info',ins.ln,"DTree","Decision tree for symbol `"+ins.name+"`:\n"+pp_dtrees(this.red.get(ins.name).decision_trees));
+          break;
+        default:
+          fail("Instruction","Unexepected instruction constructor:"+ins[c]);
+      }
+    } catch(e) {
+      e.ln = ins.ln;
+      throw e;
+    }
   }
 }

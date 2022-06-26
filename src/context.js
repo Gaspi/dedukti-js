@@ -38,3 +38,29 @@ function index_of(ctx, name, skip=0, i = 0) {
     return i;
   }
 }
+
+// DFS searches for a subterm of [term] satisfying the given predicate
+function find_subterm(predicate, term, ctx=Ctx()) {
+  if (!term) { return undefined; }
+  const here = predicate(term, ctx);
+  if (here) { return [term,ctx]; }
+  switch (term[c]) {
+    case "All":
+      return find_subterm(predicate, term.dom, ctx) ||
+             find_subterm(predicate, term.cod, extend(ctx, [term.name, term.dom]));
+    case "Lam":
+      return find_subterm(predicate, term.type, ctx) ||
+             find_subterm(predicate, term.body, extend(ctx, [term.name, term.type]));
+    case "App":
+      return find_subterm(predicate, term.func, ctx) ||
+             find_subterm(predicate, term.argm, ctx);
+    case "MVar":
+      return term.args.find(t=>find_subterm(predicate, t, ctx));
+    default: return undefined;
+  }
+}
+
+// A term is closed if no subterm can be found that is an out of scope variable.
+function is_closed(term) {
+  return !find_subterm((t,ctx)=>t[c]==='Var'&&t.index>=ctx_size(ctx), term);
+}

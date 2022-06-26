@@ -1,2 +1,2 @@
 
-function fail(title,msg) { throw {title,msg}; }
+function fail(title,msg,ln) { throw {title,msg,ln}; }

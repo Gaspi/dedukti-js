@@ -92,3 +92,53 @@ function compute_matching_problem(row,depths,def=null) {
   }
   return { [c]:'Test', match:mvars, rule:row.rule, def:def };
 }
+
+
+
+function pp_dtrees(dtrees) {
+  let res = "Count arguments:\n";
+  function pp(t,s) { res+='  '.repeat(t)+s+"\n"; }
+  function pp_dtree(dtree,t) {
+    if (!dtree) { pp(t,"Fail"); return; }
+    if (dtree[c] == 'Switch') {
+      pp(t,"Look stack["+dtree.index+"]:");
+      if (dtree.Lam) {
+        pp(t,"Case Lam:");
+        pp_dtree(dtree.Lam,t+1);
+      }
+      if (dtree.Ref) {
+        Object.entries(dtree.Ref).forEach(([ref,dts])=>
+          Object.entries(dts).forEach(function([ar,dt]) {
+            pp(t,"Case `"+ref+"`("+ar+" args):");
+            pp_dtree(dt,t+1);
+          })
+        );
+      }
+      if (dtree.Var) {
+        Object.entries(dtree.Ref).forEach(([ind,dts])=>
+          Object.entries(dts).forEach(function([ar,dt]) {
+            pp(t,"Case #"+ind+"("+ar+" args):");
+            pp_dtree(dt,t+1);
+          })
+        );
+      }
+    } else if (dtree[c] == 'Test') {
+      pp(t,"Match:");
+      dtree.match.forEach((m)=>
+        pp(t,""+m.name+"["+Object.keys(m.args).map(pp_term).join(', ')+"] = stack["+m.index+"]")
+      );
+      pp(t,"> Fire rule `"+dtree.rule.name+"`: "+pp_term(dtree.rule.rhs));
+    } else {
+      fail("PPDTree","Unexpected constructor in dtree: "+dtree[c]);
+    }
+    pp(t,"Default:");
+    pp_dtree(dtree.def, t+1);
+  }
+  
+  for (let i = 0; i < dtrees.length; i++) {
+    res+="Case "+i+":\n";
+    if (dtrees[i]) { pp_dtree(dtrees[i].tree,1); }
+    else { res += "  not computed yet...\n"; }
+  }
+  return res;
+}

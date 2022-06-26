@@ -18,8 +18,15 @@ function filter_rules(rules,arity) {
 
 class ReductionEngine {
   red = new Map();
-  
   constructor() {}
+  
+  // Get info about a symbol (adds a new entry if needed) 
+  get(name) {
+    if (!this.red.has(name)) {
+      this.red.set(name, { rules:[], decision_trees:[], injective:false });
+    }
+    return this.red.get(name);
+  }
   
   add_new_rule(rule) {
     // Find the head symbol and the stack of the rule
@@ -29,13 +36,13 @@ class ReductionEngine {
     }
     rule.head = head.name;
     rule.stack = stack;
-    // Add a new entry for a newly rewritten symbol
-    if (!this.red.get(rule.head)) {
-      this.red.set(rule.head, { rules:[], decision_trees:[], injective:false });
+    const smb = this.get(head.name);
+    if (smb.injective) {
+      fail("RuleAdd","The injective symbol `"+head.name+"` cannot be rewritten with a new rule.");
     }
     // The new rule is added to the global set of rules for that symbol
-    this.red.get(rule.head).rules.push(rule);
-    const dts = this.red.get(rule.head).decision_trees;
+    smb.rules.push(rule);
+    const dts = smb.decision_trees;
     const arity = stack.length;
     // All DTs of arity greater than that of the new rule are erased
     // (to be recomputed taking into account the new rule)
@@ -44,12 +51,20 @@ class ReductionEngine {
     for (let i = dts.length; i <= arity; i++) { dts.push(null); }
   }
   
-  // Symbols without rules are injective
-  is_injective(name) { return !this.red.get(name) || this.red.get(name).injective; }
+  // Injectivity declaration / checking
+  is_injective(name) { return this.get(name).injective; }
+  declare_injective(name) { this.get(name).injective=true; }
+  declare_constant(name) {
+    if (this.get(name).rules.length > 0) {
+      fail("ConstantDecl","The symbol `"+name+"` is not constant.");
+    }
+    this.declare_injective(name);
+  }
   
+  // Get the decision tree of given symbol when applied to this many arguments
   get_decision_tree(name,arity) {
     const r = this.red.get(name);
-    if (!r) { return null; }
+    if (!r || !r.rules.length) { return null; }
     const dts = r.decision_trees;
     if (arity >= dts.length) { arity = dts.length-1; }
     if (!dts[arity]) {
@@ -168,11 +183,17 @@ class ReductionEngine {
           matched = meta_match( stack[m.index], m.args, m.depth);
         } catch(e) {
           if (e.title == 'MetaMatchFailed') {
-            return this.exec_dtree(dtree.def, stack);
-          } else { throw e; }
+            try {
+              matched = meta_match( this.nf(stack[m.index]), m.args, m.depth);
+            } catch(e) {
+              if (e.title == 'MetaMatchFailed') {
+                return this.exec_dtree(dtree.def, stack);
+              } else { throw e; }
+            }
+          }
         }
         if (subst.get(m.name)) {
-          if (!are_convertible(subst.get(m.name), matched)) {
+          if (!this.are_convertible(subst.get(m.name), matched)) {
             return this.exec_dtree(dtree.def,stack);
           }
         } else {
@@ -190,8 +211,7 @@ class ReductionEngine {
     const acc = [ [u,v] ];
     while (acc.length > 0) {
       const [a,b] = acc.pop();
-      if (equals(a,b)) { continue; }
-      if (!same_head( this.whnf(a) , this.whnf(b) ,acc)) { return false; }
+      if (!equals(a,b) && !same_head( this.whnf(a) , this.whnf(b) ,acc)) { return false; }
     }
     return true;
   }

@@ -1,5 +1,4 @@
 
-
 // Returns [term] where each free variables instance x#0 in turned into a meta-variable
 // whose name !3 corresponds to its DeBruijn *level*. (assuming ctx_size=4 in the example)
 function vars_to_meta(term, ctx_size, depth=0) {
@@ -15,7 +14,6 @@ function vars_to_meta(term, ctx_size, depth=0) {
   }
   return s(term,depth);
 }
-
 
 // Checks whether the given term is a non-pattern meta-variable instance.
 function is_non_pattern_instance(term) {
@@ -36,11 +34,21 @@ function is_non_pattern_instance(term) {
 }
 
 // Typing and convertion assumptions mechanisms
-class Assumptions {
-  constructor(sig) {
-    this.sig = sig;
+class AssumptionSet {
+  constructor() {
     this.assumed_types = [];
     this.assumed_conv = [];
+    // Progressively build a variable substitution
+    this.subst = new Map();
+  }
+  
+  msubst(t) { return meta_subst(t, this.subst); }
+  
+  assume_conv(a,b) {
+    this.assumed_conv.push([a,b]);
+    if (a[c]==='MVar' && !this.subst.has(a.name)) {
+      this.subst.set(a.name, this.msubst(b));
+    }
   }
   
   pp() {
@@ -49,7 +57,8 @@ class Assumptions {
       res += a.ctx.map((t,i)=> "!"+i+" : "+pp_term(t)).join(", ")+ "  |-  " +
         a.name+"["+ a.args.join(', ')+"] : "+pp_term(a.type)+"\n";
     });
-    res += "\n[ASSUMED CONVERSIONS]\n";
+    res += "\n[ASSUMED CONVERSIONS]\n"+
+      this.assumed_conv.map(([a,b]) => pp_term(a)+" == "+pp_term(b)).join('\n');
     return res;
   }
 }
@@ -58,10 +67,9 @@ class Assumptions {
 // Rule checking entry point
 class RuleChecker {
   
-  constructor(sig) {
-    this.sig = sig;
-    this.env = sig.env;
-    this.red = sig.red;
+  constructor(env,red) {
+    this.env = env;
+    this.red = red;
   }
   
   //////////////////////////////////////////////////////////////
@@ -69,6 +77,10 @@ class RuleChecker {
   //////////////////////////////////////////////////////////////
   
   //TODO: move what is possible to Assumptions...
+  
+  is_injective(t) {
+    return t[c]==='Var' || (t[c]==='Ref' && this.red.is_injective(t.name));
+  }
   
   // Record a new type
   assume_mvar_type(assumptions,term, expected_type, ctx) {
@@ -85,7 +97,7 @@ class RuleChecker {
   
   // Record a conversion
   assume_convertible(assumptions, t1, t2) {
-    // TODO : we should record information from this assumed conversion
+    // We record information from this assumed conversion
     // and only return a false-value if the given terms can never be convertible
     // (warn the user that something is off...)
     const acc = [ [t1,t2] ];
@@ -94,8 +106,8 @@ class RuleChecker {
       if (equals(u,v)) { continue; }
       const a = this.red.whnf(u);
       const b = this.red.whnf(v);
-      if (a[c] === 'MVar') { assumptions.assumed_conv.push(a,b); continue; }
-      if (b[c] === 'MVar') { assumptions.assumed_conv.push(b,a); continue; }
+      if (a[c] === 'MVar') { assumptions.assume_conv(a,b); continue; }
+      if (b[c] === 'MVar') { assumptions.assume_conv(b,a); continue; }
       if (a[c] !== b[c]) { continue; }
       if (a[c] === "All") {
         acc.push([a.dom,b.dom] , [a.cod,b.cod]);
@@ -104,7 +116,7 @@ class RuleChecker {
       } else if (a[c] === "App") {
         const [head_a, args_a] = get_head(a);
         const [head_b, args_b] = get_head(b);
-        if (equals(head_a,head_b) && this.sig.is_injective(head_a)) {
+        if (equals(head_a,head_b) && this.is_injective(head_a)) {
           if (args_a.length !== args_b.length) {
             fail('LHS Conversion Check',
               'Non unifiable terms: `'+pp_term(a)+"` and `"+pp_term(b)+"`.");
@@ -113,6 +125,8 @@ class RuleChecker {
               acc.push([args_a[i],args_b[i]]);
             }
           }
+        } else {
+          assumptions.assume_conv(a,b);
         }
       }
     }
@@ -120,13 +134,12 @@ class RuleChecker {
   
   // Check wether the term can be decided convertible using the assumptions
   are_convertible(assumptions, t1, t2) {
-    // extend to use the recorded assumptions
-    return this.red.are_convertible(t1, t2);
+    return this.red.are_convertible(assumptions.msubst(t1),assumptions.msubst(t2));
   }
   
   // Find a WHNF using the assumption to get a product type ("All") if possible
   whnf(assumptions, term) {
-    return this.red.whnf(term);
+    return this.red.whnf( assumptions.msubst(term) );
   }
   
   // Note: should rather return a list of possible types
@@ -141,7 +154,7 @@ class RuleChecker {
       //   S = { assumption.args => term.args (shifted by position in assumption.ctx) }
       const S = new Map();
       for(let i = 0; i < assumption.args.length; i++) {
-        S[assumption.args[i]] = term.args[i];
+        S.set(assumption.args[i], term.args[i]);
       }
       // Check that it preserves
       // the well-typedness of assumption.ctx
@@ -158,12 +171,12 @@ class RuleChecker {
         const unchecked = Array(ctx_size).fill(true);
         while (true) {
           // Find the first unchecked variable that is mapped to something in S
-          const i = unchecked.findIndex((t,i)=>t && S['!'+i]);
+          const i = unchecked.findIndex((t,i)=>t && S.has('!'+i));
           if (i < 0) { break; } // if there are none, then the work is done: proceed
           // else compute the expected type substituted with the partial substitution S
           const type_of_ith = meta_subst(assumption.ctx[i],S);
           // TODO : better implement this check
-          this.rhs_check(assumptions, S['!'+i], type_of_ith);
+          this.rhs_check(assumptions, S.get('!'+i), type_of_ith);
           unchecked[i] = false; // Never check this index again
         }
         return meta_subst(assumption.type,S);
@@ -284,7 +297,7 @@ class RuleChecker {
         const func_t = this.whnf(assumptions, this.rhs_infer(assumptions, term.func, ctx));
         if (func_t[c] !== "All") {
           fail("RHS Infer","Non-function application on `" +
-            pp_term(term, ctx) + "`.\n" + pp_context(ctx));
+            pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
         }
         this.rhs_check(assumptions, term.argm, func_t.dom, ctx);
         return subst(func_t.cod, term.argm);
@@ -309,13 +322,15 @@ class RuleChecker {
     // console.log("CheckWithAssumption",pp_term(term,ctx), pp_term(expected_type,ctx));
     const type = this.whnf(assumptions, expected_type);
     if (type[c] == "All" && term[c] == "Lam") {
-      if (!term.type.star && !this.are_convertible(assumptions, term.type, type.dom)) {
-        fail("RHS Check", "Incompatible annotation `"+pp_term(term, ctx)+"`."+
+      this.rhs_infer(assumptions, type, ctx);
+      if (term.type.star) {
+        term.type = type.dom;
+      } else if (!this.are_convertible(assumptions, term.type, type.dom)) {
+        fail("RHS Check", "Incompatible annotation `"+pp_term(term, ctx)+"`.\n"+
           "- Expect = " + pp_term(type.dom, ctx)+"\n"+
           "- Actual = " + pp_term(term.type, ctx)+"\n"+
           pp_context(ctx) + assumptions.pp());
       }
-      this.rhs_infer(assumptions, type, ctx);
       this.rhs_check(assumptions, term.body, type.cod, extend(ctx, [type.name, type.dom]));
     } else {
       const term_t = this.rhs_infer(assumptions, term, ctx);
@@ -346,8 +361,8 @@ class RuleChecker {
     const arities = new Map();
     const check_mvar = function(t) {
       if(t[c]==='MVar') {
-        if (arities[t.name] && arities[t.name]!==t.args.length) { return true; }
-        arities[t.name] = t.args.length;
+        if (arities.has(t.name) && arities.get(t.name)!==t.args.length) { return true; }
+        arities.set(t.name, t.args.length);
       }
     }
     const wrong_arity_instance = find_subterm(check_mvar, rule.lhs) || find_subterm(check_mvar, rule.rhs);
@@ -359,7 +374,7 @@ class RuleChecker {
   
   check_rule_type_preservation(rule) {
     if (!rule.check) { return; }
-    const assumptions = new Assumptions(this.sig);
+    const assumptions = new AssumptionSet();
     const inferred_type = this.lhs_infer(assumptions, rule.lhs);
     this.rhs_check(assumptions, rule.rhs, inferred_type);
   }
@@ -370,5 +385,4 @@ class RuleChecker {
     this.check_rule_type_preservation(rule);
     this.red.add_new_rule(rule);
   }
-  
 }
