@@ -1,0 +1,12 @@
+// Calculus of Construction embedded into Lambda-Pi Modulo
+
+U : Type;
+T : U -> Type;
+
+Pi : u:U -> (T u -> U) -> U;
+PiT : (U -> U) -> U;
+
+: T (Pi u f) --> x:T X -> T (f x);
+: T (PiT  f) --> x:U   -> T (f x);
+
+Arrow (t1:U) (t2:U) : U := Pi t1 (x : T t1 => t2);
