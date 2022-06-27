@@ -54,8 +54,8 @@ const lexer = makeLexer({
     CMD_PRINT:"#PRINT",
     CMD_DTREE:"#DTREE",
     DB_INDEX:/\#[0-9]+/,
-    QID: /(?:[a-zA-Z0-9_!?']+\.)+[a-zA-Z0-9_!?']+/,
-    ID: /[a-zA-Z0-9_!?']+/,
+    QID: /(?:[a-zA-Z0-9_!?'/]+\.)+[a-zA-Z0-9_!?'/]+/,
+    ID: /[a-zA-Z0-9_!?'/]+/,
   }, ['_','COMMENT']);
 
 var grammar = {

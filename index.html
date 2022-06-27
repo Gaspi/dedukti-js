@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/fontawesome.min.css">
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
   <!-- Syntax coloring: CSS style -->
+  <link rel="stylesheet" href="ressources/main.css">
   <link rel="stylesheet" href="ressources/syntax_coloring.css">
 </head>
 <body style="overflow:clip;">
@@ -24,17 +25,34 @@
           <button type="button" class="btn btn-success dropdown-toggle btn-lg w-100" id="dropdown_examples" data-bs-toggle="dropdown" aria-expanded="false">
             Load an example
           </button>
-          <ul class="dropdown-menu w-100" aria-labelledby="dropdown_examples">
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">intro.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">intro_advanced.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO_cons.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO_rew.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO_thm.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">FO_nat.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">church.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">nat_compute.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">arities.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this.innerHTML)">arities2.dk</a></li>
+          <ul class="dropdown-menu" aria-labelledby="dropdown_examples">
+            <li><a class="dropdown-item" href="#" onclick="load_example(this)" id="startupload">intro.dk</a></li>
+            <li><a class="dropdown-item" href="#" onclick="load_example(this)">intro_advanced.dk</a></li>
+            
+            <li><a class="dropdown-item" href="#">theories</a>
+              <ul class="dropdown-menu dropdown-submenu">
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_cons.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_rew.dk</a></li>
+                <li><a class="dropdown-item" href="#">theorems</a>
+                  <ul class="dropdown-menu dropdown-submenu">
+                    <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_thm.dk</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_nat.dk</a></li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+            <li><a class="dropdown-item" href="#">computations</a>
+              <ul class="dropdown-menu dropdown-submenu">
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">church.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">nat_compute.dk</a></li>
+              </ul>
+            </li>
+            <li><a class="dropdown-item" href="#">tests</a>
+              <ul class="dropdown-menu dropdown-submenu">
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">arities.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">arities2.dk</a></li>
+              </ul>
+            </li>
             <li><hr class="dropdown-divider"></li>
             <li><input class="ml-2" type="file" id="file-input"></li>
             <li><a class="dropdown-item" href="#" onclick="download_file()">Save current to disk</a></li>
@@ -78,7 +96,14 @@ var code, instructions, sig;
 var editor, highlighter, jar;
 
 // Example loading
-function load_example(filename) {
+function load_example(e) {
+  let filename = e.innerText;
+  e = e.parentNode.parentNode;
+  while (e.classList.contains('dropdown-submenu')) {
+    filename = e.parentNode.childNodes[0].innerText+"/"+filename;
+    e = e.parentNode.parentNode;
+  }
+  
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
@@ -222,7 +247,7 @@ const drop = (e) => {
 
 // Only when page is loaded : load intro.dk and start syntax highlighting
 window.onload = function () {
-  load_example('intro.dk');
+  load_example( document.getElementById('startupload') );
   document.getElementById('file-input').onchange = (e)=>load_file(e.target.files[0]);
   editor = document.getElementById('editor');
   editor.addEventListener("dragenter", dragenter, false);
