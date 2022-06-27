@@ -70,8 +70,8 @@ line ->
   | %ID param:* %COLON term %DEF term    %END {% ([id,params,,ty,,def,e]) => Def(e.line,id.value,params,ty,def) %}
   | %ID:? %COLON term %LONGARROW    term %END {% ([id,c,lhs,,rhs ,e]) => Rew(e.line,lhs,rhs,id?id.value:'unnamed'+c.line      ) %}
   | %ID:? %COLON term %LONGFATARROW term %END {% ([id,c,lhs,,rhs ,e]) => Rew(e.line,lhs,rhs,id?id.value:'unnamed'+c.line,false) %}
-  | %CMD_REQ    %ID  alias:?             %END {% ([, id,alias    ,e]) => CmdReq(e.line,id.value,alias)          %}
-  | %CMD_REQ    %MID alias:?             %END {% ([,mid,alias    ,e]) => CmdReq(e.line,id.value.substring(1,id.value.length-1),alias)%}
+  | %CMD_REQ    %ID  alias:?             %END {% ([, id,alias    ,e]) => CmdReq(e.line, id.value,alias)         %}
+  | %CMD_REQ    %MID alias:?             %END {% ([,mid,alias    ,e]) => CmdReq(e.line,mid.value.substring(1,mid.value.length-1),alias)%}
   | %CMD_EVAL  ctxt term                 %END {% ([,c,t          ,e]) => CmdEval(e.line,c,t)                    %}
   | %CMD_INFER ctxt term                 %END {% ([,c,t          ,e]) => CmdInfer(e.line,c,t)                   %}
   | %CMD_CHECK ctxt aterm %COLON term    %END {% ([,c,t,,ty      ,e]) => CmdCheckType(e.line,c,t,ty)            %}

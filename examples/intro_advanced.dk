@@ -79,11 +79,19 @@ f (t:Ty) (x:T t) : T (arr t t):= lam t t (z => x);
 
 // Import modules with the `#REQUIRE` command.
 // This is equivalent to the module being copied/pasted here
-// #REQUIRE my_module;
+#REQUIRE tests/dummy1;
+#INFER dummy1;
 
-// An alias can be provided to prefixe imported symbol with a namespace
-// #REQUIRE intro[intro];
+// An alias can be provided to prefix all imported symbols with a namespace
+#REQUIRE tests/dummy1[dummy_module];
 // Symbols in this module can be referred with `new_name.smb`.
+#INFER dummy_module.dummy1;
+// Note that (for now) the same module can be imported twice with distinct names.
+
+// `#REQUIRE` also allows to check and import ressources from any website
+#REQUIRE "https://gaspi.github.io/examples/tests/dummy2.dk";
+#INFER dummy2;
+// Note : beware of CORS headers preventing such ressource to be received by the webpage.
 
 
 // My own TODO:
