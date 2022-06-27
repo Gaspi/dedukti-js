@@ -52,7 +52,7 @@ function DeclConst(ln,name,params,type)  {
 function DeclInj(   ln,name)             { return {[c]:'DeclInj'   , ln, name               }; }
 function DeclConstP(ln,name)             { return {[c]:'DeclConstP', ln, name               }; }
 function Rew(ln,lhs,rhs,name,check=true) { return {[c]:'Rew'       , ln, lhs,rhs,name,check }; }
-function CmdReq(ln,module,alias)               { return {[c]:'Req' , ln, module, alias      }; }
+function CmdReq(ln,module,alias)         { return {[c]:'Req'       , ln, module, alias      }; }
 function CmdEval(ln,ctx,term)            { return {[c]:'Eval'      , ln, ctx,term           }; }
 function CmdInfer(ln,ctx,term)           { return {[c]:'Infer'     , ln, ctx,term           }; }
 function CmdCheckType(ln,ctx,term,type)  { return {[c]:'CheckType' , ln, ctx,term,type      }; }

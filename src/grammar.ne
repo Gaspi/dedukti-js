@@ -50,8 +50,9 @@ const lexer = makeLexer({
     CMD_PRINT:"#PRINT",
     CMD_DTREE:"#DTREE",
     DB_INDEX:/\#[0-9]+/,
+    MID: /"[^"]*"/,
     QID: /(?:[a-zA-Z0-9_!?']+\.)+[a-zA-Z0-9_!?']+/,
-    ID: /[a-zA-Z0-9_!?']+/,
+    ID : /[a-zA-Z0-9_!?']+/,
   }, ['_','COMMENT']);
 
 %}
@@ -62,21 +63,22 @@ const lexer = makeLexer({
 lines -> line:* {% ([t]) => t %}
 
 line ->
-               %ID param:* %COLON term          %END {% ([ id,params,,ty    ,e]) => Decl(     e.line,id.value,params,ty) %}
-  | %CMD_CONST %ID param:* %COLON term          %END {% ([,id,params,,ty    ,e]) => DeclConst(e.line,id.value,params,ty) %}
-  | %CMD_CONST %ID                              %END {% ([,id               ,e]) => DeclConstP(e.line,id.value)          %}
-  | %CMD_INJ   %ID                              %END {% ([,id               ,e]) => DeclInj(e.line,id.value)             %}
-  | %ID param:* %COLON term %DEF term           %END {% ([id,params,,ty,,def,e]) => Def(e.line,id.value,params,ty,def)   %}
-  | %ID:? %COLON term %LONGARROW    term        %END {% ([id,c,lhs,,rhs     ,e]) => Rew(e.line,lhs,rhs,id?id.value:'unnamed'+c.line      ) %}
-  | %ID:? %COLON term %LONGFATARROW term        %END {% ([id,c,lhs,,rhs     ,e]) => Rew(e.line,lhs,rhs,id?id.value:'unnamed'+c.line,false) %}
-  | %CMD_REQ    %ID alias:?                     %END {% ([,id,alias         ,e]) => CmdReq(e.line,id.value,alias)        %}
-  | %CMD_EVAL  ctxt term                        %END {% ([,c,t              ,e]) => CmdEval(e.line,c,t)                  %}
-  | %CMD_INFER ctxt term                        %END {% ([,c,t              ,e]) => CmdInfer(e.line,c,t)                 %}
-  | %CMD_CHECK ctxt aterm %COLON term           %END {% ([,c,t,,ty          ,e]) => CmdCheckType(e.line,c,t,ty)          %}
-  | %CMD_CHECK ctxt aterm  %CONV term           %END {% ([,c,t1,,t2         ,e]) => CmdCheckConv(e.line,c,t1,t2,true)    %}
-  | %CMD_CHECK ctxt aterm %NCONV term           %END {% ([,c,t1,,t2         ,e]) => CmdCheckConv(e.line,c,t1,t2,false)   %}
-  | %CMD_PRINT  term                            %END {% ([,t                ,e]) => CmdPrint(e.line,t)                   %}
-  | %CMD_DTREE %ID                              %END {% ([,id               ,e]) => CmdDTree(e.line,id.value)            %}
+               %ID param:* %COLON term   %END {% ([ id,params,,ty,e]) => Decl(     e.line,id.value,params,ty)   %}
+  | %CMD_CONST %ID param:* %COLON term   %END {% ([,id,params,,ty,e]) => DeclConst(e.line,id.value,params,ty)   %}
+  | %CMD_CONST %ID                       %END {% ([,id           ,e]) => DeclConstP(e.line,id.value)            %}
+  | %CMD_INJ   %ID                       %END {% ([,id           ,e]) => DeclInj(e.line,id.value)               %}
+  | %ID param:* %COLON term %DEF term    %END {% ([id,params,,ty,,def,e]) => Def(e.line,id.value,params,ty,def) %}
+  | %ID:? %COLON term %LONGARROW    term %END {% ([id,c,lhs,,rhs ,e]) => Rew(e.line,lhs,rhs,id?id.value:'unnamed'+c.line      ) %}
+  | %ID:? %COLON term %LONGFATARROW term %END {% ([id,c,lhs,,rhs ,e]) => Rew(e.line,lhs,rhs,id?id.value:'unnamed'+c.line,false) %}
+  | %CMD_REQ    %ID  alias:?             %END {% ([, id,alias    ,e]) => CmdReq(e.line,id.value,alias)          %}
+  | %CMD_REQ    %MID alias:?             %END {% ([,mid,alias    ,e]) => CmdReq(e.line,id.value.substring(1,id.value.length-1),alias)%}
+  | %CMD_EVAL  ctxt term                 %END {% ([,c,t          ,e]) => CmdEval(e.line,c,t)                    %}
+  | %CMD_INFER ctxt term                 %END {% ([,c,t          ,e]) => CmdInfer(e.line,c,t)                   %}
+  | %CMD_CHECK ctxt aterm %COLON term    %END {% ([,c,t,,ty      ,e]) => CmdCheckType(e.line,c,t,ty)            %}
+  | %CMD_CHECK ctxt aterm  %CONV term    %END {% ([,c,t1,,t2     ,e]) => CmdCheckConv(e.line,c,t1,t2,true)      %}
+  | %CMD_CHECK ctxt aterm %NCONV term    %END {% ([,c,t1,,t2     ,e]) => CmdCheckConv(e.line,c,t1,t2,false)     %}
+  | %CMD_PRINT  term                     %END {% ([,t            ,e]) => CmdPrint(e.line,t)                     %}
+  | %CMD_DTREE %ID                       %END {% ([,id           ,e]) => CmdDTree(e.line,id.value)              %}
 
 alias -> %LEFTSQU %ID %RIGHTSQU {% ([,id,]) => id.value %}
 assign -> %ID %COLON term {% ([name,,type]) => [name.value,type] %}
