@@ -198,7 +198,8 @@ function parse(code) {
   return parser.results[0];
 }
 
-function load(name) {
+function load(module_name) {
+  const url = module_name.startsWith("http") ? module_name : "examples/"+module_name+".dk";
   let res;
   let xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
@@ -208,9 +209,9 @@ function load(name) {
     }
   };
   // Synchronous request
-  xhttp.open("GET", "examples/"+name+".dk", false);
+  xhttp.open("GET", url, false);
   xhttp.send();
-  if (!res) { fail("Load","Failed to load file `examples/"+name+".dk`."); }
+  if (!res) { fail("Load","Failed to load file `"+url+"`."); }
   return parse(res);
 }
 
