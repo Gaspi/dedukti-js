@@ -62,6 +62,16 @@ f (t:Ty) (x:T t) : T (arr t t):= lam t t (z => x);
 // Note that the injectivity is assumed (for now) and not checked.
 #INJECTIVE f;
 
+// TODO : A symbol can be introduced as a required proof of a theorem using `#THM`.
+// There must be exactly one rewrite rule rewriting such a symbol and the LHS
+// of this rule must be the unapplied symbol.
+// A file will be marked as failure if no such rule is provided.
+// The symbol is considered outside of the signature (ill-typed) until it is defined.
+#THM thm1 : Nat;
+: thm1 --> z;
+// The proof term may be provided right away with `:=`.
+#THM thm2 : Nat -> Nat  :=  x:Nat => x;
+
 // The `#PRINT` command allows to print a term
 #PRINT constant (x => z);
 

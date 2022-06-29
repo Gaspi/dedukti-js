@@ -16,9 +16,13 @@
 
 <div class="container-fluid main-wrapper">
   <div class="row justify-content-left">
-    <div class="col justify-content-center vh-100 d-flex flex-column" style="max-width:700px; background: #f2f2f2;">
+    <div class="col justify-content-center vh-100 d-flex flex-column" style="max-width:700px;">
       <div class="mx-2">
-        <button type="button" class="btn btn-primary btn-lg my-2 w-100" onclick="process_all_instructions()">
+        <h1 class="m-0 p-0 text-center align-text-bottom" style="font-size:60px">D
+        <img src="ressources/duck.png" style="margin-bottom:10px; height:65px"></img>
+        <img src="ressources/tea.jpg" style="margin-bottom:30px; height:100px"></img>
+        </h1>
+        <button type="button" class="btn btn-primary btn-lg my-2 mt-0 w-100" onclick="process_all_instructions()">
           Type Check !
         </button>
         <div class="my-2 dropdown">
@@ -53,6 +57,18 @@
               <ul class="dropdown-menu dropdown-submenu">
                 <li><a class="dropdown-item" href="#" onclick="load_example(this)">arities.dk</a></li>
                 <li><a class="dropdown-item" href="#" onclick="load_example(this)">arities2.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">dummy1.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">dummy2.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_1.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_2.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_3.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_4.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_2.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_bv1.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_bv2.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_eq1.dk</a></li>
+                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_eq2.dk</a></li>
+                
               </ul>
             </li>
             <li><hr class="dropdown-divider"></li>
@@ -64,9 +80,8 @@
       <h2 class="text-center">Ouput</h2>
       <div class="flex-fill overflow-auto" id="logs"></div>
     </div>
-    <div class="col vh-100 d-flex flex-column">
-      <h2 class="text-center">Dedukti</h2>
-      <div id="editor-wrapper" class="mx-3 mt-2 flex-fill overflow-auto">
+    <div class="col vh-100 d-flex flex-column" style="background: #f2f2f2;">
+      <div id="editor-wrapper" class="mt-2 flex-fill overflow-auto">
         <div id="editor" class="editor" style="font-family:monospace"></div>
       </div>
     </div>
@@ -231,6 +246,7 @@ function process_all_instructions() {
     log('ok',null,"File Checking","All done !");
   } catch(e) {
     log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");
+    throw(e);
   }
 }
 

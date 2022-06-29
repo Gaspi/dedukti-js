@@ -1,0 +1,6 @@
+S : Type;
+T : S -> Type;
+nat : S;
+0 : T nat;
+
+

@@ -1,0 +1,18 @@
+A : Type;
+#CONST T : A -> Type;
+
+a : A;
+#CONST f : A -> A;
+
+g : A -> A;
+: g (g X) --> f X;
+
+t : a : A -> T a;
+k : a : A -> T a -> T (f a);
+
+test : X : A -> T X -> T (g X) -> T (g X);
+//  f Y = g X
+//    X = g Z
+//---------------
+//    Z = Y
+: test X (t (g Z)) (t (f Y)) --> k Z (t Y);

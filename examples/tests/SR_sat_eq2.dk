@@ -1,0 +1,30 @@
+A : Type;
+a : A;
+#CONST c : A -> A -> A;
+
+#CONST T : A -> Type;
+t : x : A -> T x;
+
+f : A -> A;
+g : A -> A;
+
+  test0 : x : A -> T (f x)   -> T (f (f x));
+: test0   X       (t Y    ) --> t (f Y    );
+
+  test0': x : A -> T (c (f x) a)   -> T (f (f x));
+: test0'  X       (t (c Y     a)) --> t (f Y    );
+
+  test1 : x : A -> T (c (g x) a)   -> T (f (g x));
+: test1   X       (t (c (f Y) a)) --> t (f (f Y));
+
+  test2 : x : A -> T (g (c (f x) (f (f x))))  -> T (g (c (f x) (f (f x))));
+: test2   X       (t (f Y)                 ) --> t (f Y);
+
+  test3 : x : A -> T (c a (g (c (f x) (f (f x)))))  -> T (g (g (c (f x) (f (f x)))));
+: test3   X       (t (c a (f Y)                 )) --> t (g (f Y));
+
+h : A -> A;
+: h (g X) --> X;
+
+  test4 : x : A -> T (c a (g (c (f x) (f (f x)))))  -> T (g (c (f x) (f (f x))));
+: test4   X       (t (c a (f Y)                 )) --> t (h (g (f Y)));

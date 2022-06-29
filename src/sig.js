@@ -55,7 +55,6 @@ class Signature {
     if (term[c] == 'MVar') { fail("Check", "Cannot check the type of a meta-variable instance: "+pp_term(term, ctx)); }
     const type = this.red.whnf(expected_type);
     if (type[c] == "All" && term[c] == "Lam") {
-      this.infer(type, ctx);
       if (term.type.star) {
         term.type = type.dom;
       } else if (!this.red.are_convertible(term.type, type.dom)) {
@@ -64,6 +63,7 @@ class Signature {
           "- Actual = " + pp_term(term.type, ctx)+"\n"+
           pp_context(ctx));
       }
+      this.infer(type.dom, ctx);
       this.check(term.body, type.cod, extend(ctx, [type.name, type.dom]));
     } else {
       const term_t = this.infer(term, ctx);

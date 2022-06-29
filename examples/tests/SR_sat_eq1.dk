@@ -1,0 +1,6 @@
+A : Type;
+#CONST T : A -> Type;
+t : x : A -> T x;
+
+f : x : A -> T x -> T x;
+: f X (t Y) --> t Y;

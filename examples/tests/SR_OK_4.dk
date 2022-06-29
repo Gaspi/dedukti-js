@@ -1,0 +1,67 @@
+A : Type;
+a : A;
+
+f : A -> A;
+g : A -> A;
+: f (g X) --> X;
+
+#CONST T : A -> Type;
+t : a : A -> T a;
+k : a : A -> T a -> T (f a);
+
+//  f (f (f (f X)) = g W
+//     f (f (f X)) = g V
+//        f (f X)  = g U
+//           f X   = g Z
+//             X   = g Y
+//-------------------------
+//               X = g Y
+//               Y = g Z
+//               Z = g U
+//               U = g V
+//               V = g W
+test :
+  X : A ->
+  T X ->
+  T (f (f X)) ->
+  T (f (f (f (f X)))) ->
+  T (f (f (f X))) ->
+  T (f X) ->
+  T X;
+
+: test X
+    (t (g Y))
+    (t (g U))
+    (t (g W))
+    (t (g V))
+    (t (g Z))
+  --> t (g (g (g (g (g W)))));
+
+
+//  f (f (f (f X)) = g W
+//     f (f (f X)) = g V
+//        f (f X)  = g U
+//           f X   = g Z
+//             X   = g Y
+//-------------------------
+//               X = g Y
+//               Y = g Z
+//               Z = g U
+//               U = g V
+//               V = g W
+test2 :
+  X : A ->
+  T X ->
+  T (f (f (f (f X)))) ->
+  T (f (f X)) ->
+  T (f (f (f X))) ->
+  T (f X) ->
+  T X;
+
+: test2 X
+    (t (g Y))
+    (t (g W))
+    (t (g U))
+    (t (g V))
+    (t (g Z))
+  --> t (g (g (g (g (g W)))));
