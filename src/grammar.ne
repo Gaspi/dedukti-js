@@ -46,6 +46,7 @@ const lexer = makeLexer({
     CMD_INFER:"#INFER",
     CMD_CHECK:"#CHECK",
     CMD_CONST:"#CONST",
+    CMD_THM  :"#THM",
     CMD_INJ  :"#INJECTIVE",
     CMD_PRINT:"#PRINT",
     CMD_DTREE:"#DTREE",
@@ -65,6 +66,8 @@ lines -> line:* {% ([t]) => t %}
 line ->
                %ID param:* %COLON term   %END {% ([ id,params,,ty,e]) => Decl(     e.line,id.value,params,ty)   %}
   | %CMD_CONST %ID param:* %COLON term   %END {% ([,id,params,,ty,e]) => DeclConst(e.line,id.value,params,ty)   %}
+  | %CMD_THM   %ID %COLON term           %END {% ([,id,,ty       ,e]) => Thm(e.line,id.value,ty)                %}
+  | %CMD_THM   %ID %COLON term %DEF term %END {% ([,id,,ty,,def  ,e]) => Thm(e.line,id.value,ty,def)            %}
   | %CMD_CONST %ID                       %END {% ([,id           ,e]) => DeclConstP(e.line,id.value)            %}
   | %CMD_INJ   %ID                       %END {% ([,id           ,e]) => DeclInj(e.line,id.value)               %}
   | %ID param:* %COLON term %DEF term    %END {% ([id,params,,ty,,def,e]) => Def(e.line,id.value,params,ty,def) %}

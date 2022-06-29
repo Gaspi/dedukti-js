@@ -82,7 +82,7 @@ class Signature {
     if (sort[c] != "Typ" && sort[c] != "Knd") {
       fail("Declaration","Declared type is not a sort.: `" + pp_term(ins.type) + "`.");
     }
-    this.env.add_new_symbol(ins.name,ins.type);
+    this.env.add_new_symbol(ins.name,ins.type,ins[c]==="Thm");
   }
   
   // Process a single unscoped instruction
@@ -107,6 +107,15 @@ class Signature {
           this.red.declare_injective(ins.name);
           log('ok',ins.ln,"Symbol declared injective",ins.name+" (no check)");
           break;
+        case "Thm":
+          this.declare_symbol(ins);
+          if (ins.def) {
+            this.rulechecker.declare_rule( Rew(ins.ln, Ref(ins.name),ins.def,ins.name+"_def") );
+          } else {
+            log('ok',ins.ln,"Proof required","`"+ins.name+"` for theorem"+pp_term(ins.type) );
+          }
+          break;
+          
         case "Def":
           this.declare_symbol(ins);
           this.rulechecker.declare_rule( Rew(ins.ln, Ref(ins.name),ins.def,ins.name+"_def") );
@@ -159,7 +168,7 @@ class Signature {
           );
           break;
         default:
-          fail("Instruction","Unexepected instruction constructor:"+ins[c]);
+          fail("Instruction","Unexpected instruction constructor:"+ins[c]);
       }
     } catch(e) {
       e.ln = ins.ln;
@@ -169,8 +178,9 @@ class Signature {
   
   check_instructions(instructions,log=console.log,load=null,namespace="") {
     if (!Array.isArray(instructions)) {
-      fail("Instruction","Unexepected set of instructions. The checker is not used properly...");
+      fail("Instruction","Unexpected set of instructions. The checker is not used properly...");
     }
     instructions.forEach((ins) => this.check_instruction(ins,log,load,namespace));
+    this.env.all_proven(namespace);
   }
 }

@@ -28,6 +28,7 @@
 .CMD_PRINT { color:blue; font-weight:bold; }
 .CMD_CONST { color:blue; font-weight:bold; }
 .CMD_INJ   { color:blue; font-weight:bold; }
+.CMD_THM   { color:blue; font-weight:bold; }
 .CMD_DTREE { color:blue; font-weight:bold; }
 .QID       { color:black; }
 .ID        { color:black; }

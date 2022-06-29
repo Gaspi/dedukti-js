@@ -412,8 +412,16 @@ class RuleChecker {
   
   // Checks type preservation and add a new rule to the reduction machine
   declare_rule(rule) {
+    const [hd,tl] = get_head(rule.lhs);
+    if (hd[c]!=="Ref") { fail("Rule","LHS must be headed by a symbol."); }
+    const smb = this.env.get(hd.name);
+    if (smb.proof) {
+      if (smb.proven) { fail("Rule","Proof `"+smb.name+"` already provided."); }
+      if (tl.length > 0) { fail("Rule","Proof must be defined unapplied."); }
+    }
     this.check_rule_well_formed(rule);
     this.check_rule_type_preservation(rule);
     this.red.add_new_rule(rule);
+    if (smb.proof) { smb.proven=true; }
   }
 }

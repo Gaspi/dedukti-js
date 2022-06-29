@@ -51,6 +51,7 @@ function DeclConst(ln,name,params,type)  {
 }
 function DeclInj(   ln,name)             { return {[c]:'DeclInj'   , ln, name               }; }
 function DeclConstP(ln,name)             { return {[c]:'DeclConstP', ln, name               }; }
+function Thm(ln,name,type,def)           { return {[c]:'Thm'       , ln, name,type,def           }; }
 function Rew(ln,lhs,rhs,name,check=true) { return {[c]:'Rew'       , ln, lhs,rhs,name,check }; }
 function CmdReq(ln,module,alias)         { return {[c]:'Req'       , ln, module, alias      }; }
 function CmdEval(ln,ctx,term)            { return {[c]:'Eval'      , ln, ctx,term           }; }

@@ -9,34 +9,57 @@ class Environment {
   
   fresh_name(prefix="*") { return prefix+(this.star_count++); }
   
+  get_namespace(name, create_if_not_exists=false) {
+    let venv = this.env;
+    if (name==="") { return venv;}
+    const quals = name.split('.');
+    for (let i = 0; i < quals.length; i++) {
+      if (!venv.get(quals[i])) {
+        if (!create_if_not_exists) { return undefined; }
+        venv.set(quals[i], new Map());
+      }
+      venv = venv.get(quals[i]);
+    }
+    return venv;
+  }
+  
   get(fullname, create_if_not_exists=false) {
     let venv = this.env;
     const quals = fullname.split('.');
     const name = quals.pop();
     for (let i = 0; i < quals.length; i++) {
-      if (!venv[quals[i]]) {
+      if (!venv.get(quals[i])) {
         if (!create_if_not_exists) { return undefined; }
-        venv[quals[i]] = new Map();
+        venv.set(quals[i], new Map());
       }
-      venv = venv[quals[i]];
+      venv = venv.get(quals[i]);
     }
-    if (!venv[name] && create_if_not_exists) {
-      venv[name] = {fullname:fullname, rules:[]};
+    if (!venv.get(name) && create_if_not_exists) {
+      venv.set(name, {fullname:fullname});
     } else if (create_if_not_exists) {
       fail("Env","Already defined reference: `" + fullname + "`.");
     }
-    return venv[name];
+    return venv.get(name);
   }
   
-  do_get(fullname) {
-    const res = this.get(fullname);
+  do_get(name) {
+    const res = this.get(name);
     if (res) { return res; }
-    else { fail("Env","Undefined reference: `" + fullname + "`."); };
+    else { fail("Env","Undefined reference: `" + name + "`."); };
   }
   
-  add_new_symbol(fullname, type) {
-    const t = this.get(fullname,true);
+  add_new_symbol(name, type, proof=false) {
+    const t = this.get(name,true);
     t.type = type;
+    if (proof) { t.proof=true; t.proven=false; }
+  }
+  
+  all_proven(namespace) {
+    this.get_namespace(namespace).forEach(function(smb) {
+      if (smb.proof && !smb.proven) {
+        fail('Proof',"No proof `"+smb.fullname+"` was provided for theorem: "+pp_term(smb.type));
+      }
+    });
   }
   
   scope_instruction(ins, namespace='') {
