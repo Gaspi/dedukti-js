@@ -1,6 +1,26 @@
-S : Type;
-T : S -> Type;
-nat : S;
+U : Type;
+#CONST T : U -> Type;
+nat : U;
 0 : T nat;
+S : T nat -> T nat;
+
+e : u:U -> T u -> T u;
+: e * 0 --> 0;
+
+  f : (u:U -> T u ) ->  T nat;
+: f   (u   => X[u]) --> X[nat];
 
 
+P : U -> Type;
+g : (u:U -> T u -> (T u -> T u) -> P u) -> P nat;
+: g (u => zero => succ => X[zero,succ]) --> X[0,S];
+
+h : (u:U -> T u) -> T nat;
+: h (u => X) --> X;
+
+
+A : Type;
+B : Type;
+a : A;
+i : (A -> B) -> (B -> A) -> A;
+: i (x => X[x]) (y => X[y]) --> X[ X[a] ];

@@ -15,6 +15,20 @@ function vars_to_meta(term, ctx_size, depth=0) {
   return s(term,depth);
 }
 
+/** For all [args] = [t_0, ..., t_n]
+    Returns the substitution { t_i : MVar(i) | t_i is a variable below depth [depth] }
+*/
+function get_partial_meta_match(args, depth) {
+  const res = {};
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a[c]==='Var' && a.index < depth) {
+      res[a.index] = MVar(i);
+    }
+  }
+  return res;
+}
+
 // Checks whether the given term is a non-pattern meta-variable instance.
 function is_non_pattern_instance(term) {
   // Applied meta-variable are offending
@@ -49,9 +63,39 @@ class AssumptionSet {
   
   msubst(t) { return meta_subst(t, this.subst); }
   
-  // Check wether the term can be decided convertible using the given assumptions
+  // Check wether the terms can be decided convertible using the given assumptions
   are_convertible(t1,t2) {
     return this.red.are_convertible(this.msubst(t1), this.msubst(t2));
+  }
+  
+  // Check where the terms can be decided convertible using the given assumptions
+  // And assuming meta-variable !j for j < i can be substituted (in the LHS only)
+  // The meta-substitution S is updated with the required substitutions
+  // if [i] is omitted : all varialbe !j can be substituted
+  are_convertible_unify(t1, t2, S, i) {
+    t1 = this.msubst(t1);
+    t2 = this.msubst(t2);
+    // Stack of required conversion check together with their depth (used for unifications)
+    const acc = [ [t1,t2, 0] ];
+    while (acc.length > 0) {
+      const [a,b,d] = acc.pop();
+      if (equals(a,b)) { continue; }
+      const whnfa = this.red.whnf(a);
+      if (whnfa[c]==='MVar' &&
+          whnfa.name[0]==='!' &&
+          /^[0-9]+$/.test(whnfa.name.substring(1))) {
+        const index = parseInt(whnfa.name.substring(1));
+        if (index >= i) { fail('ConvCheck RHS','This should not happen'); }
+        const match = meta_match(b, get_partial_meta_match(whnfa.args, d), d);
+        // Extend the substitution S
+        S.set('!'+index, match);
+        // Apply the extended S to the LHS of the remaining conversion checks
+        acc.forEach(function(c) { c[0] = meta_subst(c[0],S); });
+        continue;
+      }
+      if (!same_head_with_depth(whnfa, this.red.whnf(b), d,acc)) { return false; }
+    }
+    return true;
   }
   
   // Find a WHNF using the assumptions to substitute meta-variables
@@ -130,6 +174,7 @@ class AssumptionSet {
   assume_mvar_type(term, expected_type, ctx) {
     const acc = [];
     while (ctx) { acc.push(ctx.head[1]); ctx = ctx.tail; }
+    acc.reverse();
     this.assumed_types.push(
       {
         name : term.name,
@@ -164,10 +209,12 @@ class RuleChecker {
   //////   Typing and convertion assumptions mechanisms  ///////
   //////////////////////////////////////////////////////////////
   
-  //TODO: move what is possible to Assumptions...
-  
-  // Note: should rather return a list of possible types
-  rhs_infer_mvar_type(assumptions, term, ctx) {
+  // Returns the first inferred type for metavariable [term] = X[a_0, ..., a_n]
+  // The typing assumptions are scan to find one that allows to infer a type for [term]
+  // for some substitution S of the locally bounded variables
+  // If [expected_type] is provided then the inferred type is checked to be unifiable with it
+  // for some extension of S
+  rhs_infer_mvar_type(assumptions, term, ctx, expected_type) {
     for (let k = 0; k < assumptions.assumed_types.length; k++) {
       
       const assumption = assumptions.assumed_types[k];
@@ -193,18 +240,31 @@ class RuleChecker {
       // Unshift it to ensure contains no remaining variable and return it
       try {
         const unchecked = Array(ctx_size).fill(true);
-        while (true) {
+        function aux(self) {
           // Find the first unchecked variable that is mapped to something in S
           const i = unchecked.findIndex((t,i)=>t && S.has('!'+i));
-          if (i < 0) { break; } // if there are none, then the work is done: proceed
+          if (i < 0) { return true; } // if there are none, then the work is done: proceed
           // else compute the expected type substituted with the partial substitution S
           const type_of_ith = meta_subst(assumption.ctx[i],S);
-          // TODO : better implement this check
-          this.rhs_check(assumptions, S.get('!'+i), type_of_ith);
+          // Infer the type of the value substituted with i in S
+          const inferred_type = self.rhs_infer(assumptions, S.get('!'+i), ctx);
+          // Check that this value S[i] has the expected type...
+          // ... for some assignation of the variables j<i in S !
+          if (!assumptions.are_convertible_unify(type_of_ith, inferred_type, S, i)) { fail(); }
+          // TODO : improve the above check...
           unchecked[i] = false; // Never check this index again
         }
-        return meta_subst(assumption.type,S);
-      } catch (e) { throw e; }
+        while (!aux(this)) {}
+        const inf_final_type = meta_subst(assumption.type, S);
+        if (!expected_type) { return inf_final_type; }
+        // If we need to check a type for the result, then unify the inferred one
+        // allowing for even further extension of S
+        if (!assumptions.are_convertible_unify(inf_final_type,expected_type,S)) { fail(); }
+        // check that the extension of S is still ok (might require even further extension of S)
+        while (!aux(this)) {}
+      } catch (e) {
+        // Ignore errors and proceed with the next assumption instead
+      }
     }
     fail("RHS Infer","Cannot infer the type of meta-variable instance `" +
       pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
@@ -258,9 +318,6 @@ class RuleChecker {
       case "Ref": return this.env.do_get(term.name).type;
       case "Var": return get_term(ctx, term.index);
       case "MVar":
-        console.log(assumptions);
-        console.log(term);
-        console.log(ctx);
         fail("LHS Check", "Could not infer the type of meta-variable instance `"+
           pp_term(term, ctx)+"`.\nThis should not happen... LHS is probably ill-formed (?)\n"+
           pp_context(ctx)+ + assumptions.pp());
@@ -363,6 +420,11 @@ class RuleChecker {
         this.rhs_infer(assumptions, type.dom, ctx);
       }
       this.rhs_check(assumptions, term.body, type.cod, extend(ctx, [type.name, type.dom]));
+    } else if (term[c]==="MVar") {
+      if (!this.rhs_infer(assumptions, term, ctx, type)) {
+        fail("RHS Check", "Could not check that meta-variable `"+pp_term(term, ctx)+"` has type `"+pp_term(type,ctx)+"`.\n"+
+          pp_context(ctx) + assumptions.pp());
+      }
     } else {
       const term_t = this.rhs_infer(assumptions, term, ctx);
       if (!assumptions.are_convertible(type, term_t)) {

@@ -114,6 +114,34 @@ function same_head(a,b,acc) {
   return true;
 }
 
+// Check that a and b have compatible head. Stacks conversion-relevant subterms in t.
+function same_head_with_depth(a,b,d,acc) {
+  if (a[c] !== b[c]) { return false; }
+  switch (a[c]) {
+    case "Var": return a.index == b.index;
+    case "Ref": return a.name == b.name;
+    case "All":
+      acc.push([a.dom,b.dom,d] , [a.cod,b.cod,d+1]);
+      break;
+    case "Lam":
+      acc.push([a.body,b.body,d+1]);
+      break;
+    case "App":
+      acc.push([a.func,b.func,d], [a.argm,b.argm,d]);
+      break;
+    case "MVar":
+      if (a.name !== b.name || a.args.length !== b.args.length) { return false; }
+      for (let i = 0; i < a.args.length; i++) {
+        acc.push([a.args[i],b.args[i],d]);
+      }
+      break;
+    case "Typ":
+    case "Knd": break;
+    default: fail("Equals","Unexpected constructor: "+term[c]);
+  }
+  return true;
+}
+
 function equals(u, v) {
   const acc = [ [u,v] ];
   while (acc.length > 0) {
