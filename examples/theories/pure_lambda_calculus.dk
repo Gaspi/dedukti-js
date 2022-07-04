@@ -1,0 +1,26 @@
+
+// Deep version
+DTerm : Type;
+
+lam : (DTerm -> DTerm) -> DTerm;
+app : DTerm -> DTerm -> DTerm;
+
+beta : app (lam f) x --> f x;
+
+dDelta : DTerm := lam (x:DTerm => app x x);
+dOmega : DTerm := app dDelta dDelta;
+
+// Non terminating...
+//#EVAL dOmega;
+
+
+
+// Shallow version
+STerm : Type;
+: STerm --> STerm -> STerm;
+
+sDelta : STerm := x:STerm => x x;
+sOmega : STerm := sDelta sDelta;
+
+// Non terminating...
+//#EVAL sOmega;
