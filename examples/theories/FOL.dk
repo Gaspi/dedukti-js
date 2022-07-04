@@ -1,0 +1,29 @@
+
+// Type of propositions
+P : Type;
+eP : P -> Type;
+
+top : P;
+: eP top --> z:P -> (eP z) -> (eP z);
+
+bot : P;
+: eP bot --> z:P -> (eP z);
+
+imp : P -> P -> P;
+: eP (imp a b) --> eP a -> eP b;
+
+not (x:P) : P := imp x bot;
+
+or : P -> P -> P;
+: eP (or x y) --> z:P -> (eP x -> eP z) -> (eP y -> eP z) -> eP z;
+
+// Type of types
+T : Type;
+
+fa : (T -> P) -> P;
+: eP (fa y) --> x:T -> eP (y x);
+
+ex : (T -> P) -> P;
+: eP (ex y) --> z:P -> (x:T -> eP (y x) -> eP z) -> eP z;
+
+const : T;

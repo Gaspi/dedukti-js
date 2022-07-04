@@ -113,6 +113,7 @@ class Signature {
           this.declare_symbol(ins);
           if (ins.def) {
             this.rulechecker.declare_rule( Rew(ins.ln, Ref(ins.name),ins.def,ins.name+"_def") );
+            log('ok',ins.ln,"Theorem proven","`"+ins.name+"` proves "+pp_term(ins.type) );
           } else {
             log('ok',ins.ln,"Proof required","`"+ins.name+"` for theorem"+pp_term(ins.type) );
           }
@@ -125,7 +126,11 @@ class Signature {
           break;
         case "Rew":
           this.rulechecker.declare_rule(ins);
-          log('ok',ins.ln,"Rewrite rule added",pp_term(ins.lhs)+ " --\> " + pp_term(ins.rhs));
+          if (ins.lhs[c]==='Ref' && this.env.get(ins.lhs.name).proven) {
+            log('ok',ins.ln,"Theorem proven",'`'+ins.lhs.name+'`');
+          } else {
+            log('ok',ins.ln,"Rewrite rule added",pp_term(ins.lhs)+ " --\> " + pp_term(ins.rhs));
+          }
           break;
         case "Eval":
           log('info',ins.ln,"Eval",pp_term(this.red.nf(ins.term, ins.ctx), ins.ctx)+"\n"+pp_context(ins.ctx));

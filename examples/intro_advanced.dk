@@ -75,10 +75,15 @@ f (t:Ty) (x:T t) : T (arr t t):= lam t t (z => x);
 // The `#PRINT` command allows to print a term
 #PRINT constant (x => z);
 
-// The `#DTREE` allows to show the decision trees used to compute a symbol.
+// The `#DTREE` command allows to show the decision trees used to compute a symbol.
 // Decision trees are computed lazily (and erased eagerly).
 // Only the decision trees that were already needed will show.
 #DTREE dummy;
+
+// The `#TIME` command shows current date and time as well as the time elapsed
+// since the previous `#TIME` command.
+// Useful for timing type checking or computations.
+#TIME;
 
 // Tired of being told your rules are not type preserving ?
 // Just skip this check and add them with the unsafe rule definition `==>`.

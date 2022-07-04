@@ -45,5 +45,5 @@ eB : B -> Type;
     P:eT (arrow X bool) =>
     p:eB (P x) => p;
 
-#THM sym_leibniz : eB (forallP (X:T => forall X (x:eT X => forall X (y:eT X => impl (leibniz X x y) (leibniz X y x)))));
+sym_leibniz : eB (forallP (X:T => forall X (x:eT X => forall X (y:eT X => impl (leibniz X x y) (leibniz X y x)))));
 
