@@ -24,3 +24,7 @@ B : Type;
 a : A;
 i : (A -> B) -> (B -> A) -> A;
 : i (x => X[x]) (y => X[y]) --> X[ X[a] ];
+
+: A --> B;
+m : A -> A;
+#EVAL i (x => m x) (y => m y);

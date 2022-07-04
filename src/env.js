@@ -2,12 +2,12 @@
 class Environment {
   env = new Map();
   // A counter to generate fresh names for anonym meta-variables
-  star_count = 0;
+  joker_count = 0;
   meta_vars = new Set();
   
   constructor() {}
   
-  fresh_name(prefix="*") { return prefix+(this.star_count++); }
+  fresh_name(prefix="*") { return prefix+(this.joker_count++); }
   
   get_namespace(name, create_if_not_exists=false) {
     let venv = this.env;
@@ -111,7 +111,7 @@ class Environment {
         e.argm = this.scope(e.argm, ctx, namespace);
         break;
       case "MVar":
-        if (e.star) {
+        if (e.joker) {
           e.name = this.fresh_name();
           e.args = [...Array( ctx_size(ctx) ).keys()].map(Var);
         } else {

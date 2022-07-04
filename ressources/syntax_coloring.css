@@ -17,7 +17,7 @@
 .RIGHTBRA  { color:blue; }
 .LEFTPAR   { color:blue; }
 .RIGHTPAR  { color:blue; }
-.STAR      { color:blue; }
+.JOKER     { color:blue; }
 .END       { color:blue; font-weight:bold; }
 .TYPE      { color:darkgreen; font-weight:bold; }
 .KIND      { color:red; font-weight:bold; }
@@ -30,6 +30,7 @@
 .CMD_INJ   { color:blue; font-weight:bold; }
 .CMD_THM   { color:blue; font-weight:bold; }
 .CMD_DTREE { color:blue; font-weight:bold; }
+.CMD_TIME  { color:blue; font-weight:bold; }
 .QID       { color:black; }
 .ID        { color:black; }
 .DB_INDEX  { color:red; }

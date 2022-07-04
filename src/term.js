@@ -13,9 +13,9 @@ function App (func, argm)                 { return {[c]:'App' , func, argm}; }
 function app(func, args) { return args.reduce(App,func); }
 
 // A pattern is a term extended with (potentially anonymous) meta-variables
-// A "star" is an anonym fully applied meta-variable. A default name and the full list of args are assigned at scoping.
-function MVar(name=null,args=[]) { return {[c]:'MVar', name, args, star:false}; }
-function Star()                  { return {[c]:'MVar', star:true}; }
+// A "joker" is an anonym fully applied meta-variable. A default name and the full list of args are assigned at scoping.
+function MVar(name=null,args=[]) { return {[c]:'MVar', name, args, joker:false}; }
+function Joker()                 { return {[c]:'MVar', joker:true}; }
 
 // Returns the head of a term together with the list of its arguments *in reverse order*
 function get_head(t) {
@@ -60,6 +60,8 @@ function CmdCheckType(ln,ctx,term,type)  { return {[c]:'CheckType' , ln, ctx,ter
 function CmdCheckConv(ln,ctx,lhs,rhs,cv) { return {[c]:'CheckConv' , ln, ctx,lhs,rhs,cv     }; }
 function CmdPrint(ln,term)               { return {[c]:'Print'     , ln, term               }; }
 function CmdDTree(ln,name)               { return {[c]:'DTree'     , ln, name               }; }
+function CmdTime(ln)                     { return {[c]:'Time'      , ln                     }; }
+
 
 // Shifts variables deeper than [depth] by [inc] in the term [term]
 function shift(term, inc=1, depth=0) {

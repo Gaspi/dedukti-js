@@ -37,7 +37,7 @@ const lexer = makeLexer({
     RIGHTBRA:'}',
     LEFTPAR :'(',
     RIGHTPAR:')',
-    STAR    :'*',
+    JOKER   :'*',
     END     :';',
     TYPE:"Type",
     KIND:"Kind",
@@ -50,6 +50,7 @@ const lexer = makeLexer({
     CMD_INJ  :"#INJECTIVE",
     CMD_PRINT:"#PRINT",
     CMD_DTREE:"#DTREE",
+    CMD_TIME :"#TIME",
     DB_INDEX:/\#[0-9]+/,
     MID: /"[^"]*"/,
     QID: /(?:[a-zA-Z0-9_!?'/]+\.)+[a-zA-Z0-9_!?'/]+/,
@@ -82,6 +83,7 @@ line ->
   | %CMD_CHECK ctxt aterm %NCONV term    %END {% ([,c,t1,,t2     ,e]) => CmdCheckConv(e.line,c,t1,t2,false)     %}
   | %CMD_PRINT  term                     %END {% ([,t            ,e]) => CmdPrint(e.line,t)                     %}
   | %CMD_DTREE %ID                       %END {% ([,id           ,e]) => CmdDTree(e.line,id.value)              %}
+  | %CMD_TIME                            %END {% ([              ,e]) => CmdTime(e.line)                        %}
 
 alias -> %LEFTSQU %ID %RIGHTSQU {% ([,id,]) => id.value %}
 assign -> %ID %COLON term {% ([name,,type]) => [name.value,type] %}
@@ -98,7 +100,7 @@ qid -> %ID _qid:* {% ([a,args]) => [a.value].concat(args).join('.') %}
 _qid -> %DOT %ID {% ([,t]) => t.value %}
 
 sterm ->
-    %STAR                       {% () => Star() %}
+    %JOKER                      {% () => Joker() %}
   | %TYPE                       {% () => Typ()  %}
   | %KIND                       {% () => Knd()  %}
   | %ID %LEFTSQU args %RIGHTSQU {% ([id,,args]) => MVar(id.value,args) %}
@@ -114,7 +116,7 @@ term ->
   | %ID %COLON aterm %ARROW term                       {% ([ id,,dom, ,cod]) => All(id.value,dom,cod) %}
   | %LEFTPAR %ID %COLON aterm %RIGHTPAR %ARROW term    {% ([,id,,dom,,,cod]) => All(id.value,dom,cod) %}
   | aterm %ARROW term                                  {% ([     dom, ,cod]) => All(null,dom,cod) %}
-  | %ID %FATARROW term                                 {% ([id,,body])       => Lam(id.value,Star(),body) %}
+  | %ID %FATARROW term                                 {% ([id,,body])       => Lam(id.value,Joker(),body) %}
   | %ID %COLON aterm %FATARROW term                    {% ([id,,type,,body]) => Lam(id.value,type,body) %}
   | %LEFTPAR %ID %COLON aterm %RIGHTPAR %FATARROW term {% ([,id,,type,,,body]) => Lam(id.value,type,body) %}
   | %LEFTPAR %ID %COLON aterm %DEF aterm %RIGHTPAR %FATARROW term

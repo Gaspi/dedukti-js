@@ -336,7 +336,7 @@ class RuleChecker {
     } else {
       const type = assumptions.whnf(expected_type);
       if (type[c] === "All" && term[c] === "Lam") {
-        if (!term.type.star) { fail("LHS Check", "Please avoid type annotations in LHS..."); }
+        if (!term.type.joker) { fail("LHS Check", "Please avoid type annotations in LHS..."); }
         this.lhs_infer(assumptions, type.dom, ctx);
         this.lhs_check(assumptions, term.body, type.cod, extend(ctx, [type.name, type.dom]) );
       } else {
@@ -409,7 +409,7 @@ class RuleChecker {
     const type = assumptions.whnf(expected_type);
     if (type[c] == "All" && term[c] == "Lam") {
       this.rhs_infer(assumptions, type, ctx);
-      if (term.type.star) {
+      if (term.type.joker) {
         term.type = type.dom;
       } else if (!assumptions.are_convertible(term.type, type.dom)) {
         fail("RHS Check", "Incompatible annotation `"+pp_term(term, ctx)+"`.\n"+

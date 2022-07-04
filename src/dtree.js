@@ -3,7 +3,7 @@
 // to an application of this symbol to at least [arity] arguments
 
 function compute_row(rule, arity) {
-  return { rule:rule, cols: Array(arity-rule.stack.length).fill(Star()).concat(rule.stack) };
+  return { rule:rule, cols: Array(arity-rule.stack.length).fill(Joker()).concat(rule.stack) };
 }
 
 function compute_decision_tree(rules, arity) {
@@ -61,12 +61,12 @@ function compute_dtree(m) {
 function specialize_row(cols,j,cons,name,extra_cols) {
   const [pat,stack] = get_head(cols[j]);
   if (pat[c] == 'MVar') {
-    return cols.concat(Array(extra_cols).fill(Star()));
+    return cols.concat(Array(extra_cols).fill(Joker()));
   }
   if (pat[c] != cons) { return null; }
   if (cons!='Lam' && ( (pat.name || pat.index) != name || stack.length != extra_cols)) { return null; }
   const ncols = cols.concat( cons == 'Lam' ? [pat.body] : stack );
-  ncols[j] = Star();
+  ncols[j] = Joker();
   return ncols;
 }
 
@@ -86,7 +86,7 @@ function compute_matching_problem(row,depths,def=null) {
   const mvars = [];
   for (let i = 0; i < row.cols.length; i++) {
     const p = row.cols[i];
-    if (p[c] == 'MVar' && !p.star) {
+    if (p[c] == 'MVar' && !p.joker) {
       mvars.push({ index:i, name:p.name, args:get_meta_match(p.args), depth:depths[i] });
     }
   }

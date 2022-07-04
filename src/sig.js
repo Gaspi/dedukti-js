@@ -2,6 +2,8 @@
 class Signature {
   
   constructor(env = new Environment(), red = new ReductionEngine()) {
+    this.start_time=new Date();
+    this.time=this.start_time;
     this.env = env;
     this.red = red;
     this.rulechecker = new RuleChecker(env,red);
@@ -55,7 +57,7 @@ class Signature {
     if (term[c] == 'MVar') { fail("Check", "Cannot check the type of a meta-variable instance: "+pp_term(term, ctx)); }
     const type = this.red.whnf(expected_type);
     if (type[c] == "All" && term[c] == "Lam") {
-      if (term.type.star) {
+      if (term.type.joker) {
         term.type = type.dom;
       } else if (!this.red.are_convertible(term.type, type.dom)) {
         fail("Check", "Incompatible annotation `"+pp_term(term, ctx)+"`."+
@@ -158,6 +160,12 @@ class Signature {
         case "DTree":
           log('info',ins.ln,'DTree',"Decision tree for symbol `"+ins.name+"`:\n"+pp_dtrees(this.red.get(ins.name).decision_trees));
           break;
+        case "Time":
+          const d = new Date();
+          const dt = d.getTime() - this.time.getTime();
+          log('info',ins.ln,'Time',''+d.toLocaleString()+'  ('+dt+'ms since last clock)');
+          this.time = d;
+          break;
         case "Req":
           if (!load) { fail('Require',"Current setup does not support `#REQUIRE`."); }
           this.check_instructions(
@@ -183,4 +191,5 @@ class Signature {
     instructions.forEach((ins) => this.check_instruction(ins,log,load,namespace));
     this.env.all_proven(namespace);
   }
+  
 }

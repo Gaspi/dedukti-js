@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="ressources/main.css">
   <link rel="stylesheet" href="ressources/syntax_coloring.css">
 </head>
-<body style="overflow:clip;">
+<body> <!--<body style="overflow:clip;">-->
 
 <div class="container-fluid main-wrapper">
   <div class="row justify-content-left">
@@ -75,7 +75,11 @@
             </li>
             <li><hr class="dropdown-divider"></li>
             <li><input class="ml-2" type="file" id="file-input"></li>
-            <li><a class="dropdown-item" href="#" onclick="download_file()">Save current to disk</a></li>
+            <li>
+              <input class="ml-2" type="text" id="url-input">
+              <button onclick="load_url(document.getElementById('url-input').value)">Load URL</button>
+            </li>
+            <li><a class="dropdown-item" href="#" onclick="download_editor_content()">Download editor content</a></li>
           </ul>
         </div>
       </div>
@@ -114,6 +118,20 @@
 var code, instructions, sig;
 var editor, highlighter, jar;
 
+// Source load from URL
+function load_url(url) {
+  const xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+       // Typical action to be performed when the document is ready:
+       jar.updateCode(xhttp.responseText);
+       process_all_instructions();
+    }
+  };
+  xhttp.open("GET", url, true);
+  xhttp.send();
+}
+
 // Example loading
 function load_example(e) {
   let filename = e.innerText;
@@ -122,17 +140,7 @@ function load_example(e) {
     filename = e.parentNode.childNodes[0].innerText+"/"+filename;
     e = e.parentNode.parentNode;
   }
-  
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-       // Typical action to be performed when the document is ready:
-       jar.updateCode(xhttp.responseText);
-       process_all_instructions();
-    }
-  };
-  xhttp.open("GET", "examples/"+filename, true);
-  xhttp.send();
+  load_url("examples/"+filename);
 }
 
 // File loading
@@ -146,9 +154,9 @@ function load_file(file) {
   reader.readAsText(file);
 }
 
-// Editor content downloading
-function download_file() {
-  const file = new File([editor.textContent], "dedukti.dk")
+// Custom text downloading as file
+function download_text(text) {
+  const file = new File([text], "dedukti.dk")
   // Create a link and set the URL using `createObjectURL`
   const link = document.createElement("a");
   link.style.display = "none";
@@ -165,6 +173,9 @@ function download_file() {
     link.parentNode.removeChild(link);
   }, 0);
 }
+
+// Editor content downloading
+function download_editor_content() { download_text(editor.textContent); }
 
 // Logs handling
 const logs = document.getElementById("logs");
@@ -217,7 +228,7 @@ function parse(code) {
   return parser.results[0];
 }
 
-function load(module_name) {
+function load_module(module_name) {
   const url = module_name.startsWith("http") ? module_name : "examples/"+module_name+".dk";
   let res;
   let xhttp = new XMLHttpRequest();
@@ -244,8 +255,9 @@ function process_all_instructions() {
     // Reseting the signature
     sig = new Signature();
     // Checking each instructions with the signature
-    sig.check_instructions(instructions,log,load);
-    log('ok',null,"File Checking","All done !");
+    sig.check_instructions(instructions,log,load_module);
+    const chrono = (new Date()).getTime() - sig.start_time.getTime();
+    log('ok',null,"File Checking","All done ("+chrono+"ms) !");
   } catch(e) {
     log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");
     throw(e);

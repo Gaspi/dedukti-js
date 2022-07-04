@@ -10,7 +10,7 @@ function pp_term_wp(term, ctx = Ctx()) {
     case "Lam": return "("+pp_term(term,ctx)+")";
     case "PreScope": return '?'+term.name;
     case "Ref" : return term.name;
-    case "MVar": return term.star ? '*' : term.name+"["+term.args.map((x)=>pp_term(x,ctx)).join(',')+"]";
+    case "MVar": return term.joker ? '*' : term.name+"["+term.args.map((x)=>pp_term(x,ctx)).join(',')+"]";
   }
 }
 
