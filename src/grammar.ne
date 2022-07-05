@@ -65,26 +65,30 @@ const lexer = makeLexer({
 lines -> line:* {% ([t]) => t %}
 
 line ->
-               %ID param:* %COLON term   %END {% ([ id,params,,ty,e]) => Decl(     e.line,id.value,params,ty)   %}
-  | %CMD_CONST %ID param:* %COLON term   %END {% ([,id,params,,ty,e]) => DeclConst(e.line,id.value,params,ty)   %}
-  | %CMD_THM   %ID %COLON term           %END {% ([,id,,ty       ,e]) => Thm(e.line,id.value,ty)                %}
-  | %CMD_THM   %ID %COLON term %DEF term %END {% ([,id,,ty,,def  ,e]) => Thm(e.line,id.value,ty,def)            %}
-  | %CMD_CONST %ID                       %END {% ([,id           ,e]) => DeclConstP(e.line,id.value)            %}
-  | %CMD_INJ   %ID                       %END {% ([,id           ,e]) => DeclInj(e.line,id.value)               %}
-  | %ID param:* %COLON term %DEF term    %END {% ([id,params,,ty,,def,e]) => Def(e.line,id.value,params,ty,def) %}
-  | %ID:? %COLON term %LONGARROW    term %END {% ([id,c,lhs,,rhs ,e]) => Rew(e.line,lhs,rhs,id?id.value:'unnamed'+c.line      ) %}
-  | %ID:? %COLON term %LONGFATARROW term %END {% ([id,c,lhs,,rhs ,e]) => Rew(e.line,lhs,rhs,id?id.value:'unnamed'+c.line,false) %}
-  | %CMD_REQ    %ID  alias:?             %END {% ([, id,alias    ,e]) => CmdReq(e.line, id.value,alias)         %}
-  | %CMD_REQ    %MID alias:?             %END {% ([,mid,alias    ,e]) => CmdReq(e.line,mid.value.substring(1,mid.value.length-1),alias)%}
-  | %CMD_EVAL  ctxt term                 %END {% ([,c,t          ,e]) => CmdEval(e.line,c,t)                    %}
-  | %CMD_INFER ctxt term                 %END {% ([,c,t          ,e]) => CmdInfer(e.line,c,t)                   %}
-  | %CMD_CHECK ctxt aterm %COLON term    %END {% ([,c,t,,ty      ,e]) => CmdCheckType(e.line,c,t,ty)            %}
-  | %CMD_CHECK ctxt aterm  %CONV term    %END {% ([,c,t1,,t2     ,e]) => CmdCheckConv(e.line,c,t1,t2,true)      %}
-  | %CMD_CHECK ctxt aterm %NCONV term    %END {% ([,c,t1,,t2     ,e]) => CmdCheckConv(e.line,c,t1,t2,false)     %}
-  | %CMD_PRINT  term                     %END {% ([,t            ,e]) => CmdPrint(e.line,t)                     %}
-  | %CMD_DTREE %ID                       %END {% ([,id           ,e]) => CmdDTree(e.line,id.value)              %}
-  | %CMD_TIME                            %END {% ([              ,e]) => CmdTime(e.line)                        %}
+               id param:* %COLON term           e {% ([ id,params,,ty     ,e]) => Decl(e,id,params,ty           ) %}
+  | %CMD_CONST id param:* %COLON term           e {% ([,id,params,,ty     ,e]) => Decl(e,id,params,ty,null,'cst') %}
+  | %CMD_THM   id         %COLON term           e {% ([,id,       ,ty     ,e]) => Decl(e,id,[]    ,ty,null,'thm') %}
+  | %CMD_THM   id         %COLON term %DEF term e {% ([,id,       ,ty,,def,e]) => Decl(e,id,[]    ,ty,def ,'thm') %}
+  |            id param:* %COLON term %DEF term e {% ([ id,params,,ty,,def,e]) => Decl(e,id,params,ty,def)        %}
+  |            id param:*             %DEF term e {% ([ id,params    ,,def,e]) => Decl(e,id,params,null,def)      %}
+  | %CMD_CONST id                               e {% ([,id           ,e]) => DeclConst(e,id)                   %}
+  | %CMD_INJ   id                               e {% ([,id           ,e]) => DeclInj(  e,id)                   %}
+  | id:? %COLON term %LONGARROW    term         e {% ([id,c,lhs,,rhs ,e]) => Rew(e,lhs,rhs,id || ('unnamed'+c.line)      ) %}
+  | id:? %COLON term %LONGFATARROW term         e {% ([id,c,lhs,,rhs ,e]) => Rew(e,lhs,rhs,id || ('unnamed'+c.line),false) %}
+  | %CMD_REQ    id  alias:?                     e {% ([, id,alias    ,e]) => CmdReq(e,id,alias)                %}
+  | %CMD_REQ    mid alias:?                     e {% ([,mid,alias    ,e]) => CmdReq(e,mid,alias)%}
+  | %CMD_EVAL  ctxt term                        e {% ([,c,t          ,e]) => CmdEval(e,c,t)                    %}
+  | %CMD_INFER ctxt term                        e {% ([,c,t          ,e]) => CmdInfer(e,c,t)                   %}
+  | %CMD_CHECK ctxt aterm %COLON term           e {% ([,c,t,,ty      ,e]) => CmdCheckType(e,c,t,ty)            %}
+  | %CMD_CHECK ctxt aterm  %CONV term           e {% ([,c,t1,,t2     ,e]) => CmdCheckConv(e,c,t1,t2,true)      %}
+  | %CMD_CHECK ctxt aterm %NCONV term           e {% ([,c,t1,,t2     ,e]) => CmdCheckConv(e,c,t1,t2,false)     %}
+  | %CMD_PRINT  term                            e {% ([,t            ,e]) => CmdPrint(e,t)                     %}
+  | %CMD_DTREE id                               e {% ([,id           ,e]) => CmdDTree(e,id.value)              %}
+  | %CMD_TIME                                   e {% ([              ,e]) => CmdTime(e)                        %}
 
+id  -> %ID  {% ([id ]) =>  id.value %}
+mid -> %MID {% ([mid]) => mid.value.substring(1,mid.value.length-1)  %}
+e   -> %END {% ([e  ]) =>   e.line  %}
 alias -> %LEFTSQU %ID %RIGHTSQU {% ([,id,]) => id.value %}
 assign -> %ID %COLON term {% ([name,,type]) => [name.value,type] %}
 
@@ -112,12 +116,12 @@ sterm ->
 aterm -> sterm sterm:* {% ([te,ts]) => app(te,ts) %}
 
 term ->
-    aterm                                              {% ([t]) => t %}
-  | %ID %COLON aterm %ARROW term                       {% ([ id,,dom, ,cod]) => All(id.value,dom,cod) %}
-  | %LEFTPAR %ID %COLON aterm %RIGHTPAR %ARROW term    {% ([,id,,dom,,,cod]) => All(id.value,dom,cod) %}
-  | aterm %ARROW term                                  {% ([     dom, ,cod]) => All(null,dom,cod) %}
-  | %ID %FATARROW term                                 {% ([id,,body])       => Lam(id.value,Joker(),body) %}
-  | %ID %COLON aterm %FATARROW term                    {% ([id,,type,,body]) => Lam(id.value,type,body) %}
-  | %LEFTPAR %ID %COLON aterm %RIGHTPAR %FATARROW term {% ([,id,,type,,,body]) => Lam(id.value,type,body) %}
-  | %LEFTPAR %ID %COLON aterm %DEF aterm %RIGHTPAR %FATARROW term
-    {% ([,id,,type,,val,,,body]) => App(Lam(id.value,type,body), val) %}
+    aterm                                             {% ([t]) => t %}
+  | id %COLON aterm %ARROW term                       {% ([ id,,dom,  ,cod ]) => All(id,dom,cod)      %}
+  | %LEFTPAR id %COLON aterm %RIGHTPAR %ARROW term    {% ([,id,,dom,, ,cod ]) => All(id,dom,cod)      %}
+  | aterm %ARROW term                                 {% ([     dom,  ,cod ]) => All(null,dom,cod)    %}
+  | id              %FATARROW term                    {% ([ id,       ,body]) => Lam(id,Joker(),body) %}
+  | id %COLON aterm %FATARROW term                    {% ([ id,,type, ,body]) => Lam(id,type,body)    %}
+  | %LEFTPAR id %COLON aterm %RIGHTPAR %FATARROW term {% ([,id,,type,,,body]) => Lam(id,type,body)    %}
+  | %LEFTPAR id %COLON aterm %DEF aterm %RIGHTPAR %FATARROW term
+    {% ([,id,,type,,val,,,body]) => App(Lam(id,type,body), val) %}

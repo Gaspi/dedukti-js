@@ -17,80 +17,94 @@
 <div class="container-fluid main-wrapper">
   <div class="row justify-content-left">
     <div class="col justify-content-center vh-100 d-flex flex-column" style="max-width:700px;">
-      <div class="mx-2">
-        <h1 class="m-0 p-0 text-center align-text-bottom" style="font-size:60px">D
-        <img src="ressources/duck.png" style="margin-bottom:10px; height:65px"></img>
-        <img src="ressources/tea.jpg" style="margin-bottom:30px; height:100px"></img>
-        </h1>
-        <button type="button" class="btn btn-primary btn-lg my-2 mt-0 w-100" onclick="process_all_instructions()">
-          Type Check !
-        </button>
-        <div class="my-2 dropdown">
-          <button type="button" class="btn btn-success dropdown-toggle btn-lg w-100" id="dropdown_examples" data-bs-toggle="dropdown" aria-expanded="false">
-            Load an example
+      <div class="mx-2 row">
+        <div class="col-md-auto mx-4">
+          <h1 class="m-0 p-0 text-center align-text-bottom" style="max-width:400px; font-size:60px">D
+          <img src="ressources/duck.png" style="margin-bottom:10px; height:65px"></img>
+          <img src="ressources/tea.jpg" style="margin-bottom:30px; height:100px"></img>
+          </h1>
+        </div>
+        <div class="col-md" style="display:inline-block;">
+          <button type="button" class="btn btn-primary btn-lg my-2 mt-0 w-100" id="check_button" onclick="clear_logs();check_editor()">
+            Check !
           </button>
-          <ul class="dropdown-menu" aria-labelledby="dropdown_examples">
-            <li><a class="dropdown-item" href="#" onclick="load_example(this)" id="startupload">intro.dk</a></li>
-            <li><a class="dropdown-item" href="#" onclick="load_example(this)">intro_advanced.dk</a></li>
-            
-            <li><a class="dropdown-item" href="#">theories</a>
-              <ul class="dropdown-menu dropdown-submenu">
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">pure_lambda_calculus.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">FOL.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_cons.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_rew.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">sttfa.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">cc.dk</a></li>
-                <li><a class="dropdown-item" href="#">theorems</a>
-                  <ul class="dropdown-menu dropdown-submenu">
-                    <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_thm.dk</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_nat.dk</a></li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-            <li><a class="dropdown-item" href="#">computations</a>
-              <ul class="dropdown-menu dropdown-submenu">
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">church.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">nat_compute.dk</a></li>
-              </ul>
-            </li>
-            <li><a class="dropdown-item" href="#">tests</a>
-              <ul class="dropdown-menu dropdown-submenu">
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">arities.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">arities2.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">dummy1.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">dummy2.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_1.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_2.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_3.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_4.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_2.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_bv1.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_bv2.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_eq1.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_eq2.dk</a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_cool_ex.dk</a></li>
-                
-              </ul>
-            </li>
-            <li><a class="dropdown-item" href="#">sudoku</a>
-              <ul class="dropdown-menu dropdown-submenu">
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">sudoku.dk       </a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_empty.dk  </a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_easy.dk   </a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_medium.dk </a></li>
-                <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_hardest.dk</a></li>
-              </ul>
-            </li>
-            <li><hr class="dropdown-divider"></li>
-            <li><input class="ml-2" type="file" id="file-input"></li>
-            <li>
-              <input class="ml-2" type="text" id="url-input">
-              <button onclick="load_url(document.getElementById('url-input').value)">Load URL</button>
-            </li>
-            <li><a class="dropdown-item" href="#" onclick="download_editor_content()">Download editor content</a></li>
-          </ul>
+          <div class="my-2 dropdown">
+            <button type="button" class="btn btn-secondary dropdown-toggle btn-lg w-100" id="dropdown_examples" data-bs-toggle="dropdown" aria-expanded="false">
+              Load
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="dropdown_examples">
+              <li><a class="dropdown-item" href="#" onclick="load_example(this)" id="startupload">intro.dk</a></li>
+              <li><a class="dropdown-item" href="#" onclick="load_example(this)">intro_advanced.dk</a></li>
+              <li><a class="dropdown-item" href="#">theories</a>
+                <ul class="dropdown-menu dropdown-submenu">
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">pure_lambda_calculus.dk</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">FOL.dk</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_cons.dk</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_rew.dk</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">sttfa.dk</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">cc.dk</a></li>
+                  <li><a class="dropdown-item" href="#">theorems</a>
+                    <ul class="dropdown-menu dropdown-submenu">
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_thm.dk</a></li>
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_nat.dk</a></li>
+                    </ul>
+                  </li>
+                </ul>
+              </li>
+              <li><a class="dropdown-item" href="#">computations</a>
+                <ul class="dropdown-menu dropdown-submenu">
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">church.dk</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">nat_compute.dk</a></li>
+                </ul>
+              </li>
+              <li><a class="dropdown-item" href="#">tests</a>
+                <ul class="dropdown-menu dropdown-submenu">
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">arities.dk</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">arities2.dk</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">dummy1.dk</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">dummy2.dk</a></li>
+                  <li><a class="dropdown-item" href="#">SR</a>
+                    <ul class="dropdown-menu dropdown-submenu">
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_1.dk</a></li>
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_2.dk</a></li>
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_3.dk</a></li>
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_4.dk</a></li>
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_2.dk</a></li>
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_bv1.dk</a></li>
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_bv2.dk</a></li>
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_eq1.dk</a></li>
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_eq2.dk</a></li>
+                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_cool_ex.dk</a></li>
+                    </ul>
+                  </li>
+                  
+                </ul>
+              </li>
+              <li><a class="dropdown-item" href="#">sudoku</a>
+                <ul class="dropdown-menu dropdown-submenu">
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">sudoku.dk       </a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_empty.dk  </a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_easy.dk   </a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_medium.dk </a></li>
+                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_hardest.dk</a></li>
+                </ul>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li><input class="ml-2" type="file" id="file-input"></li>
+              <li>
+                <input class="my-2 ml-2" type="text" id="url-input">
+                <button class="btn btn-secondary btn-sm mb-1" onclick="load_url(document.getElementById('url-input').value)">Load URL</button>
+              </li>
+              <li><a class="dropdown-item" href="#" onclick="download_editor_content()">Download editor content</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <div class="mx-2 form-check">
+                  <input class="form-check-input" type="checkbox" value="" id="check_after_load" checked/>
+                  <label class="form-check-label" for="check_after_load">Check after load</label>
+                </div>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
       <h2 class="text-center">Ouput</h2>
@@ -128,14 +142,49 @@
 var code, instructions, sig;
 var editor, highlighter, jar;
 
+function get(id) { return document.getElementById(id); }
+
+function updateEditor(code) {
+  jar.updateCode(code);
+  clear_logs();
+  if (get('check_after_load').checked) { check_editor(); }
+}
+
+function set_button_mode(mode) {
+  const check_button = get('check_button');
+  check_button.classList.remove('btn-primary','btn-warning','btn-success','btn-danger');
+  const button_style = {
+    'check'   : { classname:'btn-primary', message:'Check'       },
+    'checking': { classname:'btn-warning', message:'Checking...' },
+    'checked' : { classname:'btn-success', message:'Checked!'    },
+    'error'   : { classname:'btn-danger' , message:'Error!'      },
+  }[mode];
+  check_button.classList.add(button_style.classname);
+  check_button.innerText = button_style.message;
+}
+
+function check_editor() {
+  set_button_mode('checking');
+  setTimeout(function() {
+    try {
+      process_all_instructions();
+      set_button_mode('checked');
+    } catch(e) {
+      log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");
+      set_button_mode('error');
+  //      throw(e); //Uncomment to see the error in console
+    }
+  }, 10);
+}
+
 // Source load from URL
 function load_url(url) {
+  if (!url) { return updateEditor(''); }
   const xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
-       // Typical action to be performed when the document is ready:
-       jar.updateCode(xhttp.responseText);
-       process_all_instructions();
+      // When the file is loaded, update editor with content (and check)
+      updateEditor(xhttp.responseText);
     }
   };
   xhttp.open("GET", url, true);
@@ -157,10 +206,7 @@ function load_example(e) {
 function load_file(file) {
   if (!file) { return; }
   const reader = new FileReader();
-  reader.onload = function(e) {
-    jar.updateCode(e.target.result);
-    process_all_instructions();
-  };
+  reader.onload = (e)=>updateEditor(e.target.result);
   reader.readAsText(file);
 }
 
@@ -188,31 +234,37 @@ function download_text(text) {
 function download_editor_content() { download_text(editor.textContent); }
 
 // Logs handling
-const logs = document.getElementById("logs");
-function clear_logs() { logs.innerHTML = ""; }
+const logs = get("logs");
+function clear_logs() {
+  logs.innerHTML = "";
+  const editor_wrapper = get('editor-wrapper');
+  const children = editor_wrapper.children;
+  for (let i = children.length-1; i > 0; i--) {
+    editor_wrapper.removeChild(editor_wrapper.children[i]);
+  }
+}
 // Display a new block in the loading area
-const editor_wrapper = document.getElementById('editor-wrapper');
 function log(status,ln,title,msg) {
   const div = document.createElement('div');
   div.style['white-space']= 'pre-wrap';
   div.innerHTML = (ln?ln+": ":"")+'<strong>['+title+']</strong> '+msg;
   div.classList.add('p-1', 'm-2', 'alert');
   const tag = {
-    ok  :'success',
-    info:'info',
-    warn:'warning',
-    err :'danger',
+      ok  :'success',
+      info:'info',
+      warn:'warning',
+      err :'danger',
     }[status];
   div.classList.add('alert-'+tag);
   logs.appendChild(div);
   if (ln>0) {
     const hovering = div.cloneNode();
-    editor_wrapper.appendChild(hovering);
+    get('editor-wrapper').appendChild(hovering);
     hovering.style.zIndex=100;
     hovering.style.position = "absolute";
     hovering.style.display = "none";
     hovering.innerHTML = '<strong>['+title+']</strong> '+msg;
-    const l = document.getElementById('l'+ln);
+    const l = get('l'+ln);
     l.classList.add('text-'+tag);
     l.href="#"
     l.onmouseover = function() {
@@ -257,21 +309,15 @@ function load_module(module_name) {
 
 // Main processing loop
 function process_all_instructions() {
-  clear_logs();
-  try {
-    // Parsing of input text code
-    let instructions = parse(editor.textContent);
-    log('ok',null,"Parsing","done.");
-    // Reseting the signature
-    sig = new Signature();
-    // Checking each instructions with the signature
-    sig.check_instructions(instructions,log,load_module);
-    const chrono = (new Date()).getTime() - sig.start_time.getTime();
-    log('ok',null,"File Checking","All done ("+chrono+"ms) !");
-  } catch(e) {
-    log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");
-    throw(e);
-  }
+  // Parsing of input text code
+  let instructions = parse(editor.textContent);
+  log('ok',null,"Parsing","done.");
+  // Reseting the signature
+  sig = new Signature();
+  // Checking each instructions with the signature
+  sig.check_instructions(instructions,log,load_module);
+  const chrono = (new Date()).getTime() - sig.start_time.getTime();
+  log('ok',null,"File Checking","All done ("+chrono+"ms) !");
 }
 
 const dragenter = (e) => {
@@ -290,9 +336,8 @@ const drop = (e) => {
 
 // Only when page is loaded : load intro.dk and start syntax highlighting
 window.onload = function () {
-  load_example( document.getElementById('startupload') );
-  document.getElementById('file-input').onchange = (e)=>load_file(e.target.files[0]);
-  editor = document.getElementById('editor');
+  get('file-input').onchange = (e)=>load_file(e.target.files[0]);
+  editor = get('editor');
   editor.addEventListener("dragenter", dragenter, false);
   editor.addEventListener("dragover", dragover, false);
   editor.addEventListener("drop", drop, false);
@@ -305,10 +350,12 @@ window.onload = function () {
       myError: moo.error
     });
   const highlight = editor => {
+    set_button_mode('check');
     highlighter.reset(editor.textContent);
     editor.innerHTML = Array.from(highlighter).map(x=>x.value).join('');
   };
   jar = CodeJar(editor, withLineNumbers(highlight, options={ color:'black' }), {tab: ' '.repeat(4)});
+  load_example( get('startupload') );
 };
 
 </script>

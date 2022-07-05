@@ -84,7 +84,7 @@ class Signature {
     if (sort[c] != "Typ" && sort[c] != "Knd") {
       fail("Declaration","Declared type is not a sort.: `" + pp_term(ins.type) + "`.");
     }
-    this.env.add_new_symbol(ins.name,ins.type,ins[c]==="Thm");
+    this.env.add_new_symbol(ins.name, ins.type, ins[c]==="Thm");
   }
   
   // Process a single unscoped instruction
@@ -93,36 +93,33 @@ class Signature {
       this.env.scope_instruction(ins, namespace);
       switch (ins[c]) {
         case "Decl":
+          ins.type = ins.type || this.infer(ins.def);
           this.declare_symbol(ins);
-          log('ok',ins.ln,"Symbol declared",ins.name+" with type " +pp_term(ins.type) );
+          if (ins.constant) {
+            this.red.declare_constant(ins.name);
+            log('ok',ins.ln,"Constant symbol declared","`"+ins.name+"` with type " +pp_term(ins.type) );
+          } else if (ins.def) {
+            this.rulechecker.declare_rule( Rew(ins.ln, Ref(ins.name),ins.def,ins.name+"_def") );
+            if (ins.theorem) {
+              log('ok',ins.ln,"Theorem proven","`"+ins.name+"` proves "+pp_term(ins.type) );
+            } else {
+              log('ok',ins.ln,"Symbol defined","`"+ins.name+ "` as " + pp_term(ins.def));
+            }
+          } else {
+            if (ins.theorem) {
+              log('ok',ins.ln,"Proof required","`"+ins.name+"` for theorem"+pp_term(ins.type) );
+            } else {
+              log('ok',ins.ln,"Symbol declared","`"+ins.name+"` with type " +pp_term(ins.type) );
+            }
+          }
           break;
         case "DeclConst":
-          this.declare_symbol(ins);
           this.red.declare_constant(ins.name);
-          log('ok',ins.ln,"Constant symbol declared",ins.name+" with type " +pp_term(ins.type) );
-          break;
-        case "DeclConstP":
-          this.red.declare_constant(ins.name);
-          log('ok',ins.ln,"Symbol declared constant",ins.name);
+          log('ok',ins.ln,"Symbol declared constant","`"+ins.name+"`");
           break;
         case "DeclInj":
           this.red.declare_injective(ins.name);
-          log('ok',ins.ln,"Symbol declared injective",ins.name+" (no check)");
-          break;
-        case "Thm":
-          this.declare_symbol(ins);
-          if (ins.def) {
-            this.rulechecker.declare_rule( Rew(ins.ln, Ref(ins.name),ins.def,ins.name+"_def") );
-            log('ok',ins.ln,"Theorem proven","`"+ins.name+"` proves "+pp_term(ins.type) );
-          } else {
-            log('ok',ins.ln,"Proof required","`"+ins.name+"` for theorem"+pp_term(ins.type) );
-          }
-          break;
-          
-        case "Def":
-          this.declare_symbol(ins);
-          this.rulechecker.declare_rule( Rew(ins.ln, Ref(ins.name),ins.def,ins.name+"_def") );
-          log('ok',ins.ln,"Symbol defined",ins.name+ " as " + pp_term(ins.def));
+          log('ok',ins.ln,"Symbol declared injective","`"+ins.name+"` (no check)");
           break;
         case "Rew":
           this.rulechecker.declare_rule(ins);

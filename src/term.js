@@ -33,34 +33,25 @@ function PreScope(name) { return {[c]:'PreScope', name}; }
 function PreRef(name)   { return {[c]:'PreRef', name}; }
 
 // Instructions
-function Decl(     ln,name,params,type)  {
+function Decl(ln,name,params,type,def,dtype) {
   return {[c]:'Decl', ln, name,
-      type: params.reduceRight((t,[x,ty])=>All(x,ty,t),type)
+      type: type && params.reduceRight((t,[x,ty])=>All(x,ty,t),type),
+      def : def ? params.reduceRight((t,[x,ty])=>Lam(x,ty,t), def ) : undefined,
+      constant: dtype==="cst",
+      theorem : dtype==="thm",
     };
 }
-function Def(ln,name,params,type,def)    {
-  return {[c]:'Def', ln, name,
-      type: params.reduceRight((t,[x,ty])=>All(x,ty,t), type),
-      def : params.reduceRight((t,[x,ty])=>Lam(x,ty,t), def )
-    };
-}
-function DeclConst(ln,name,params,type)  {
-  return { [c]:'DeclConst', ln, name,
-      type: params.reduceRight((a,b)=>[b,a],type)
-    };
-}
-function DeclInj(   ln,name)             { return {[c]:'DeclInj'   , ln, name               }; }
-function DeclConstP(ln,name)             { return {[c]:'DeclConstP', ln, name               }; }
-function Thm(ln,name,type,def)           { return {[c]:'Thm'       , ln, name,type,def           }; }
-function Rew(ln,lhs,rhs,name,check=true) { return {[c]:'Rew'       , ln, lhs,rhs,name,check }; }
-function CmdReq(ln,module,alias)         { return {[c]:'Req'       , ln, module, alias      }; }
-function CmdEval(ln,ctx,term)            { return {[c]:'Eval'      , ln, ctx,term           }; }
-function CmdInfer(ln,ctx,term)           { return {[c]:'Infer'     , ln, ctx,term           }; }
-function CmdCheckType(ln,ctx,term,type)  { return {[c]:'CheckType' , ln, ctx,term,type      }; }
-function CmdCheckConv(ln,ctx,lhs,rhs,cv) { return {[c]:'CheckConv' , ln, ctx,lhs,rhs,cv     }; }
-function CmdPrint(ln,term)               { return {[c]:'Print'     , ln, term               }; }
-function CmdDTree(ln,name)               { return {[c]:'DTree'     , ln, name               }; }
-function CmdTime(ln)                     { return {[c]:'Time'      , ln                     }; }
+function Rew(ln,lhs,rhs,name,check=true) { return {[c]:'Rew'      , ln, lhs,rhs,name,check }; }
+function DeclInj(  ln,name)              { return {[c]:'DeclInj'  , ln, name               }; }
+function DeclConst(ln,name)              { return {[c]:'DeclConst', ln, name               }; }
+function CmdReq(ln,module,alias)         { return {[c]:'Req'      , ln, module, alias      }; }
+function CmdEval(ln,ctx,term)            { return {[c]:'Eval'     , ln, ctx,term           }; }
+function CmdInfer(ln,ctx,term)           { return {[c]:'Infer'    , ln, ctx,term           }; }
+function CmdCheckType(ln,ctx,term,type)  { return {[c]:'CheckType', ln, ctx,term,type      }; }
+function CmdCheckConv(ln,ctx,lhs,rhs,cv) { return {[c]:'CheckConv', ln, ctx,lhs,rhs,cv     }; }
+function CmdPrint(ln,term)               { return {[c]:'Print'    , ln, term               }; }
+function CmdDTree(ln,name)               { return {[c]:'DTree'    , ln, name               }; }
+function CmdTime(ln)                     { return {[c]:'Time'     , ln                     }; }
 
 
 // Shifts variables deeper than [depth] by [inc] in the term [term]
