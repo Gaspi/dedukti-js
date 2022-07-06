@@ -1,5 +1,5 @@
+// Test 1
 A : Type;
-
 a : A;
 b : A;
 c : A;
@@ -14,7 +14,6 @@ f : A -> A -> A -> A -> A;
 : f b --> h;
 : f --> i;
 
-
 #CHECK f a a a b == g b;
 #CHECK f c a b == i c a b;
 #CHECK f b a b == h a b;
@@ -22,3 +21,24 @@ f : A -> A -> A -> A -> A;
 #CHECK f a a == i a a;
 #CHECK f a == i a;
 #CHECK f == i;
+
+
+// Test 2
+N : Type;
+0 : N;
+S : N -> N;
+
+T : N -> Type;
+: T 0 --> N;
+: T (S X) --> N -> T X;
+
+k : x : N -> T x;
+
+j : N -> N;
+: j (k 0            ) --> 0;
+: j (k (S 0)     0  ) --> S 0;
+: j (k (S (S 0)) 0 0) --> S (S 0);
+
+#CHECK j (k 0            ) == 0;
+#CHECK j (k (S 0)     0  ) == S 0;
+#CHECK j (k (S (S 0)) 0 0) == S (S 0);

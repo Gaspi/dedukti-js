@@ -9,4 +9,4 @@ PiT : (U -> U) -> U;
 : T (Pi u f) --> x:T u -> T (f x);
 : T (PiT  f) --> x:U   -> T (f x);
 
-Arrow (t1:U) (t2:U) : U := Pi t1 (x : T t1 => t2);
+arrow (t1:U) (t2:U) : U := Pi t1 (x : T t1 => t2);

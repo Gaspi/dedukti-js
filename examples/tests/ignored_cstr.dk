@@ -1,0 +1,23 @@
+//Test 1
+A : Type;
+B : Type;
+b : B;
+f : A -> B;
+: f b --> b;
+
+// Test 2
+C : Type;
+D : Type;
+d : D;
+g : C -> D;
+: g d --> d;
+
+// Test 3
+E : Type;
+e : E;
+T : E -> Type;
+U : Type;
+h : T e -> U;
+
+u : U;
+: h u --> u;

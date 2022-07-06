@@ -1,0 +1,6 @@
+
+Dummy : Type;
+dummy : Dummy;
+
+Fummy : (Dummy -> Dummy) -> Dummy;
+fummy := Fummy (x=>x);

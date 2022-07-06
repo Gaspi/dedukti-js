@@ -94,18 +94,18 @@ f (t:Ty) (x:T t) : T (arr t t):= lam t t (z => x);
 
 // Import modules with the `#REQUIRE` command.
 // This is equivalent to the module being copied/pasted here
-#REQUIRE tests/dummy1;
-#INFER dummy1;
+#REQUIRE tests/basics;
+#EVAL fummy;
 
 // An alias can be provided to prefix all imported symbols with a namespace
-#REQUIRE tests/dummy1[dummy_module];
+#REQUIRE theories/FOL[fol];
 // Symbols in this module can be referred with `new_name.smb`.
-#INFER dummy_module.dummy1;
+#EVAL fol.not;
 // Note that (for now) the same module can be imported twice with distinct names.
 
-// `#REQUIRE` also allows to check and import ressources from any website
-#REQUIRE "https://gaspi.github.io/examples/tests/dummy2.dk";
-#INFER dummy2;
+// `#REQUIRE` also allows to check and import ressources from any third party servers
+#REQUIRE "https://gaspi.github.io/examples/theories/pure_lambda_calculus.dk"[lc];
+#INFER lc.lam;
 // Note : beware of CORS headers preventing such ressource to be received by the webpage.
 
 
