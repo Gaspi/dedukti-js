@@ -53,8 +53,8 @@ const lexer = makeLexer({
     CMD_TIME :"#TIME",
     DB_INDEX:/\#[0-9]+/,
     MID: /"[^"]*"/,
-    QID: /(?:[a-zA-Z0-9_!?'/]+\.)+[a-zA-Z0-9_!?'/]+/,
-    ID: /[a-zA-Z0-9_!?'/]+/,
+    QID: /(?:[a-zA-Z0-9_!?'/@]+\.)+[a-zA-Z0-9_!?'/@]+/,
+    ID: /[a-zA-Z0-9_!?'/@]+/,
   }, ['_','COMMENT']);
 
 %}
@@ -83,32 +83,31 @@ line ->
   | %CMD_CHECK ctxt aterm  %CONV term           e {% ([,c,t1,,t2     ,e]) => CmdCheckConv(e,c,t1,t2,true)      %}
   | %CMD_CHECK ctxt aterm %NCONV term           e {% ([,c,t1,,t2     ,e]) => CmdCheckConv(e,c,t1,t2,false)     %}
   | %CMD_PRINT  term                            e {% ([,t            ,e]) => CmdPrint(e,t)                     %}
-  | %CMD_DTREE id                               e {% ([,id           ,e]) => CmdDTree(e,id.value)              %}
+  | %CMD_DTREE id                               e {% ([,id           ,e]) => CmdDTree(e,id)                    %}
   | %CMD_TIME                                   e {% ([              ,e]) => CmdTime(e)                        %}
 
 id  -> %ID  {% ([id ]) =>  id.value %}
 mid -> %MID {% ([mid]) => mid.value.substring(1,mid.value.length-1)  %}
 e   -> %END {% ([e  ]) =>   e.line  %}
-alias -> %LEFTSQU %ID %RIGHTSQU {% ([,id,]) => id.value %}
-assign -> %ID %COLON term {% ([name,,type]) => [name.value,type] %}
+alias -> %LEFTSQU id %RIGHTSQU {% ([,id,]) => id %}
+assign -> id %COLON term {% ([name,,type]) => [name,type] %}
 
-ctxt -> null {% () => [] %} | %ENT {% () => [] %} | assign _ctxt:* %ENT {% ([a,args]) => [a].concat(args) %}
+ctxt -> null            {% () => [] %}
+  | %ENT                {% () => [] %}
+  | assign _ctxt:* %ENT {% ([a,args]) => [a].concat(args) %}
 _ctxt -> %COMMA assign {% ([,a]) => a %}
 
-param -> %LEFTPAR %ID %COLON term %RIGHTPAR {% ([,v,,ty]) => [v.value,ty] %}
+param -> %LEFTPAR id %COLON term %RIGHTPAR {% ([,v,,ty]) => [v,ty] %}
 
 args  -> null {% () => [] %} | term _args:* {% ([a,args]) => [a].concat(args) %}
 _args -> %COMMA term {% ([,t]) => t %}
-
-qid -> %ID _qid:* {% ([a,args]) => [a.value].concat(args).join('.') %}
-_qid -> %DOT %ID {% ([,t]) => t.value %}
 
 sterm ->
     %JOKER                      {% () => Joker() %}
   | %TYPE                       {% () => Typ()  %}
   | %KIND                       {% () => Knd()  %}
-  | %ID %LEFTSQU args %RIGHTSQU {% ([id,,args]) => MVar(id.value,args) %}
-  | %ID                         {% ([id]) => PreScope(id.value) %}
+  | id %LEFTSQU args %RIGHTSQU {% ([id,,args]) => MVar(id,args) %}
+  | id                         {% ([id]) => PreScope(id) %}
   | %QID                        {% ([id]) => PreRef(id.value) %}
   | %DB_INDEX                   {% ([dbi]) => Var( parseInt(dbi.value.substring(1)) ) %}
   | %LEFTPAR term %RIGHTPAR     {% ([,t,]) => t %}
