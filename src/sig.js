@@ -11,17 +11,17 @@ class Signature {
   
   // Infers the type of a term
   infer(term, ctx=Ctx()) {
-    // console.log("Infer",term[c],term,pp_term(term,ctx));
-    switch (term[c]) {
+    // console.log("Infer",term.c,term,pp_term(term,ctx));
+    switch (term.c) {
       case "Knd": fail("Infer","Cannot infer the type of Kind !");
       case "Typ": return Knd();
       case "All":
         const dom_sort = this.red.whnf( this.infer(term.dom, ctx) );
         const cod_sort = this.red.whnf( this.infer(term.cod, extend(ctx, [term.name, term.dom])) );
-        if (dom_sort[c] != "Typ") {
+        if (dom_sort.c !== "Typ") {
           fail("Infer","Domain of forall is not a type: `" + pp_term(term, ctx) + "`.\n" + pp_context(ctx));
         }
-        if (cod_sort[c] != "Typ" && cod_sort[c] != "Knd") {
+        if (cod_sort.c !== "Typ" && cod_sort.c !== "Knd") {
           fail("Infer","Codomain of forall is neither a type nor a kind: `" + pp_term(term, ctx) + "`.\n" + pp_context(ctx));
         }
         return cod_sort;
@@ -36,7 +36,7 @@ class Signature {
         }
       case "App":
         const func_t = this.red.whnf( this.infer(term.func, ctx));
-        if (func_t[c] !== "All") {
+        if (func_t.c !== "All") {
           fail("Infer","Non-function application on `" + pp_term(term, ctx) + "`.\n" + pp_context(ctx));
         }
         this.check(term.argm, func_t.dom, ctx);
@@ -53,10 +53,10 @@ class Signature {
   
   // Checks if a term has given expected type
   check(term, expected_type, ctx=Ctx()) {
-    // console.log("Check",term[c],term, pp_term(term,ctx));
-    if (term[c] == 'MVar') { fail("Check", "Cannot check the type of a meta-variable instance: "+pp_term(term, ctx)); }
+    // console.log("Check",term.c,term, pp_term(term,ctx));
+    if (term.c === 'MVar') { fail("Check", "Cannot check the type of a meta-variable instance: "+pp_term(term, ctx)); }
     const type = this.red.whnf(expected_type);
-    if (type[c] == "All" && term[c] == "Lam") {
+    if (type.c === "All" && term.c === "Lam") {
       if (term.type.joker) {
         term.type = type.dom;
       } else if (!this.red.are_convertible(term.type, type.dom)) {
@@ -81,17 +81,17 @@ class Signature {
   // Checks declared type and adds a new symbol to the environment
   declare_symbol(ins) {
     const sort = this.red.whnf( this.infer(ins.type) );
-    if (sort[c] != "Typ" && sort[c] != "Knd") {
+    if (sort.c !== "Typ" && sort.c !== "Knd") {
       fail("Declaration","Declared type is not a sort.: `" + pp_term(ins.type) + "`.");
     }
-    this.env.add_new_symbol(ins.name, ins.type, ins[c]==="Thm");
+    this.env.add_new_symbol(ins.name, ins.type, ins.c==="Thm");
   }
   
   // Process a single unscoped instruction
   check_instruction(ins,log=console.log,load=null,namespace="") {
     try {
       this.env.scope_instruction(ins, namespace);
-      switch (ins[c]) {
+      switch (ins.c) {
         case "Decl":
           ins.type = ins.type || this.infer(ins.def);
           this.declare_symbol(ins);
@@ -123,7 +123,7 @@ class Signature {
           break;
         case "Rew":
           this.rulechecker.declare_rule(ins);
-          if (ins.lhs[c]==='Ref' && this.env.get(ins.lhs.name).proven) {
+          if (ins.lhs.c==='Ref' && this.env.get(ins.lhs.name).proven) {
             log('ok',ins.ln,"Theorem proven",'`'+ins.lhs.name+'`');
           } else {
             log('ok',ins.ln,"Rewrite rule added",pp_term(ins.lhs)+ " --\> " + pp_term(ins.rhs));
@@ -180,12 +180,14 @@ class Signature {
           log('ok',ins.ln,'Require',"Module `"+ins.module+"` successfully loaded.");
           break;
         default:
-          fail("Instruction","Unexpected instruction constructor:"+ins[c]);
+          fail("Instruction","Unexpected instruction constructor:"+ins.c);
       }
+    //*
     } catch(e) {
       e.ln = ins.ln;
       throw e;
     }
+    //*/
   }
   
   check_instructions(instructions,log=console.log,load=null,namespace="") {

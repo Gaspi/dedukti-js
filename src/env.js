@@ -86,7 +86,7 @@ class Environment {
   // Scoping of (meta-)terms and instructions, potentially in place.
   scope(e, ctx=Ctx(), namespace='') {
     if (!e) { return e; }
-    switch (e[c]) {
+    switch (e.c) {
       // Variable, meta-variable or symbol to scope
       case "PreScope":
         const ind = index_of(ctx,e.name);

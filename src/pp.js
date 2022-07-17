@@ -1,7 +1,7 @@
 
 // Converts a term to a string
 function pp_term_wp(term, ctx = Ctx()) {
-  switch (term[c]) {
+  switch (term.c) {
     case "Knd": return "Kind";
     case "Typ": return "Type";
     case "Var": return get_name(ctx, term.index) || "#"+term.index;
@@ -15,10 +15,10 @@ function pp_term_wp(term, ctx = Ctx()) {
 }
 
 function pp_term(term, ctx = Ctx()) {
-  switch (term[c]) {
+  switch (term.c) {
     case "App":
       let text = "";
-      for(; term[c] == "App"; term = term.func) {
+      for(; term.c === "App"; term = term.func) {
         text = pp_term_wp(term.argm,ctx)+" "+text;
       }
       return pp_term(term,ctx)+" "+text;

@@ -32,62 +32,7 @@
             <button type="button" class="btn btn-secondary dropdown-toggle btn-lg w-100" id="dropdown_examples" data-bs-toggle="dropdown" aria-expanded="false">
               Load
             </button>
-            <ul class="dropdown-menu" aria-labelledby="dropdown_examples">
-              <li><a class="dropdown-item" href="#" onclick="load_example(this)" id="startupload">intro.dk</a></li>
-              <li><a class="dropdown-item" href="#" onclick="load_example(this)">intro_advanced.dk</a></li>
-              <li><a class="dropdown-item" href="#">theories</a>
-                <ul class="dropdown-menu dropdown-submenu">
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">pure_lambda_calculus.dk</a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">FOL.dk</a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_cons.dk</a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_rew.dk</a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">sttfa.dk</a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">cc.dk</a></li>
-                  <li><a class="dropdown-item" href="#">theorems</a>
-                    <ul class="dropdown-menu dropdown-submenu">
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_thm.dk</a></li>
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">FO_nat.dk</a></li>
-                    </ul>
-                  </li>
-                </ul>
-              </li>
-              <li><a class="dropdown-item" href="#">computations</a>
-                <ul class="dropdown-menu dropdown-submenu">
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">church.dk</a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">nat_compute.dk</a></li>
-                </ul>
-              </li>
-              <li><a class="dropdown-item" href="#">tests</a>
-                <ul class="dropdown-menu dropdown-submenu">
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">basics.dk</a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">arities.dk</a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">ignored_cstr.dk</a></li>
-                  <li><a class="dropdown-item" href="#">SR</a>
-                    <ul class="dropdown-menu dropdown-submenu">
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_1.dk</a></li>
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_2.dk</a></li>
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_3.dk</a></li>
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_OK_4.dk</a></li>
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_2.dk</a></li>
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_bv1.dk</a></li>
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_bv2.dk</a></li>
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_eq1.dk</a></li>
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_sat_eq2.dk</a></li>
-                      <li><a class="dropdown-item" href="#" onclick="load_example(this)">SR_cool_ex.dk</a></li>
-                    </ul>
-                  </li>
-                  
-                </ul>
-              </li>
-              <li><a class="dropdown-item" href="#">sudoku</a>
-                <ul class="dropdown-menu dropdown-submenu">
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">sudoku.dk       </a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_empty.dk  </a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_easy.dk   </a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_medium.dk </a></li>
-                  <li><a class="dropdown-item" href="#" onclick="load_example(this)">solve_hardest.dk</a></li>
-                </ul>
-              </li>
+            <ul class="dropdown-menu" aria-labelledby="dropdown_examples" id="dropdown-main-menu">
               <li><hr class="dropdown-divider"></li>
               <li><input class="ml-2" type="file" id="file-input"></li>
               <li>
@@ -117,7 +62,6 @@
   </div>
 </div>
 
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
 <script src="src/utils.js"></script>
 <script src="src/term.js"></script>
@@ -137,6 +81,76 @@
 <script src="ressources/linenumbers.js"></script>
 
 <script>
+// Standard libraries
+const default_load = 'examples/intro.dk';
+const quick_loads = [
+  'intro.dk',
+  'intro_advanced.dk',
+  { folder:'theories', content: [
+    'pure_lambda_calculus.dk',
+    'FOL.dk',
+    'FO_cons.dk',
+    'FO_rew.dk',
+    'sttfa.dk',
+    'cc.dk',
+    { folder:'theorems', content: [
+      'FO_thm.dk',
+      'FO_nat.dk',
+      ] },
+  ] },
+  { folder:'computations', content: [
+      'church.dk',
+      'nat_compute.dk',
+    ] },
+  { folder:'tests', content: [
+    'basics.dk',
+    'arities.dk',
+    'ignored_cstr.dk',
+    'readable_nat.dk',
+    { folder:'SR', content: [
+      'SR_OK_1.dk',
+      'SR_OK_2.dk',
+      'SR_OK_3.dk',
+      'SR_OK_4.dk',
+      'SR_sat_2.dk',
+      'SR_sat_bv1.dk',
+      'SR_sat_bv2.dk',
+      'SR_sat_eq1.dk',
+      'SR_sat_eq2.dk',
+      'SR_cool_ex.dk',
+      ] },
+    ] },
+  { folder:'sudoku', content: [
+    'sudoku.dk',
+    'solve_empty.dk',
+    'solve_easy.dk',
+    'solve_medium.dk',
+    'solve_hardest.dk',
+  ] },
+];
+
+// Functions to populate the dropdown menu
+function add_quick_load(e, element, prefix) {
+  const li = document.createElement('li');
+  const a = li.appendChild(document.createElement('a'));
+  a.classList.add("dropdown-item");
+  a.href="#";
+  if (e.folder) {
+    a.innerText = e.folder;
+    const ul = li.appendChild(document.createElement('ul'));
+    ul.classList.add("dropdown-menu", "dropdown-submenu");
+    add_quick_loads(e.content, ul, prefix+"/"+e.folder);
+  } else {
+    a.innerText = e;
+    a.onclick = ()=>load_url(prefix+'/'+e);
+  }
+  element.prepend(li);
+}
+function add_quick_loads(modules, element, prefix) {
+  modules.reverse().forEach((m)=>add_quick_load(m,element,prefix));
+}
+
+
 // Global variables for easy access
 var code, instructions, sig;
 var editor, highlighter, jar;
@@ -165,14 +179,15 @@ function set_button_mode(mode) {
 function check_editor() {
   set_button_mode('checking');
   setTimeout(function() {
-    try {
+    //try {
       process_all_instructions();
       set_button_mode('checked');
+    /*
     } catch(e) {
       log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");
       set_button_mode('error');
-  //      throw(e); //Uncomment to see the error in console
     }
+    //*/
   }, 10);
 }
 
@@ -354,7 +369,8 @@ window.onload = function () {
     editor.innerHTML = Array.from(highlighter).map(x=>x.value).join('');
   };
   jar = CodeJar(editor, withLineNumbers(highlight, options={ color:'black' }), {tab: ' '.repeat(4)});
-  load_example( get('startupload') );
+  add_quick_loads(quick_loads, get('dropdown-main-menu'),'examples');
+  load_url(default_load);
 };
 
 </script>

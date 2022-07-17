@@ -44,7 +44,7 @@ function find_subterm(predicate, term, ctx=Ctx()) {
   if (!term) { return undefined; }
   const here = predicate(term, ctx);
   if (here) { return [term,ctx]; }
-  switch (term[c]) {
+  switch (term.c) {
     case "All":
       return find_subterm(predicate, term.dom, ctx) ||
              find_subterm(predicate, term.cod, extend(ctx, [term.name, term.dom]));
@@ -62,5 +62,5 @@ function find_subterm(predicate, term, ctx=Ctx()) {
 
 // A term is closed if no subterm can be found that is an out of scope variable.
 function is_closed(term) {
-  return !find_subterm((t,ctx)=>t[c]==='Var'&&t.index>=ctx_size(ctx), term);
+  return !find_subterm((t,ctx)=>t.c==='Var'&&t.index>=ctx_size(ctx), term);
 }

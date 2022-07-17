@@ -31,8 +31,8 @@ class ReductionEngine {
   add_new_rule(rule) {
     // Find the head symbol and the stack of the rule
     const [head,stack] = get_head(rule.lhs);
-    if (head[c] !== 'Ref') {
-      fail("Scope","Unexpected head symbol in rule left-hand side: "+head[c]);
+    if (head.c !== 'Ref') {
+      fail("Scope","Unexpected head symbol in rule left-hand side: "+head.c);
     }
     rule.head = head.name;
     rule.stack = stack;
@@ -69,6 +69,7 @@ class ReductionEngine {
     if (arity >= dts.length) { arity = dts.length-1; }
     if (!dts[arity]) {
       const [rules, max_arity] = filter_rules(r.rules, arity);
+      if (!rules.length) { return null; }
       if (!dts[max_arity]) {
         dts[max_arity] = compute_decision_tree(rules, max_arity);
       }
@@ -88,7 +89,7 @@ class ReductionEngine {
   nf_state(state) {
     const [head,stack] = this.whnf_state(state);
     for (let i=0; i<stack.length;i++) { stack[i] = this.nf(stack[i]); };
-    switch (head[c]) {
+    switch (head.c) {
       case "All":
         head.dom = this.nf(head.dom);
         head.cod = this.nf(head.cod);
@@ -111,7 +112,7 @@ class ReductionEngine {
   whnf_state(state) {
     while (true) {
       const [head,stack] = state;
-      switch (head[c]) {
+      switch (head.c) {
         case "Lam":
           if (stack.length == 0) { return state; } // Unapplied lambda
           const [rhead, rstack] = to_state( subst(head.body, stack.pop()) );
@@ -150,10 +151,10 @@ class ReductionEngine {
   // Running the dtree using the given arguments (in reverse order)
   exec_dtree(dtree, stack) {
     if (!dtree) { return [null,null]; }
-    if (dtree[c] == 'Switch') {
+    if (dtree.c == 'Switch') {
       const hstate = to_state(stack[dtree.index])
       const [head,hstack] = this.whnf_state(hstate);
-      switch (head[c]) {
+      switch (head.c) {
         case 'Lam':
           if (!dtree.Lam) { return this.exec_dtree(dtree.def,stack); }
           stack.push(head.body);
@@ -172,9 +173,9 @@ class ReductionEngine {
           return this.exec_dtree(dtree.Var[head.index][hstack.length], stack);
         case 'MVar':
           return this.exec_dtree(dtree.def,stack);
-        default: fail("DTreeExec","Unexpected constructor in switch case: "+head[c]);
+        default: fail("DTreeExec","Unexpected constructor in switch case: "+head.c);
       }
-    } else if (dtree[c] == 'Test') {
+    } else if (dtree.c == 'Test') {
       const subst = new Map();
       let m, matched;
       for (let i = 0; i < dtree.match.length; i++) {
@@ -202,7 +203,7 @@ class ReductionEngine {
       }
       return [dtree.rule, subst];
     } else {
-      fail("DTreeExec","Unexpected DTree constructor: "+dtree[c]);
+      fail("DTreeExec","Unexpected DTree constructor: "+dtree.c);
     }
   }
   
