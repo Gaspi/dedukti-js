@@ -1,9 +1,4 @@
 
-// Conversion to/from state representation: [head,stack]
-function to_state(term) { return get_head(term); }
-function from_state([head,stack]) { return stack.reduceRight(App,head); }
-
-
 function filter_rules(rules,arity) {
   const res = [];
   let max = -1;
@@ -212,7 +207,7 @@ class ReductionEngine {
     const acc = [ [u,v] ];
     while (acc.length > 0) {
       const [a,b] = acc.pop();
-      if (!equals(a,b) && !same_head( this.whnf(a) , this.whnf(b) ,acc)) { return false; }
+      if (!equals(a,b) && !same_head( this.whnf(a) , this.whnf(b) , acc )) { return false; }
     }
     return true;
   }

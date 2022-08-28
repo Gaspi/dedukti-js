@@ -306,7 +306,7 @@ class RuleChecker {
       case "App":
         const func_t = assumptions.whnf(this.lhs_infer(assumptions, term.func, ctx));
         // Technically we don't need to fail here : if we can't infer a product type
-        // then we can just ignore the rest of the typing
+        // then we can just ignore the rest of the typing of this LHS subterm
         // or just check that term.argm is well-typed (with any type).
         // We should probably at least warn that something looks weird though.
         if (func_t.c !== "All") {

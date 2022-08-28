@@ -24,6 +24,10 @@ function get_head(t) {
   return [t,args];
 }
 
+// Conversion to/from state representation: [head,stack]
+function to_state(term) { return get_head(term); }
+function from_state([head,stack]) { return stack.reduceRight(App,head); }
+
 
 // Pre-scoping objects that can be either references or locally bounded variables
 function PreScope(name) { return {c:'PreScope', name}; }
@@ -80,8 +84,8 @@ function shift(term, inc=1, depth=0) {
 function same_head(a,b,acc) {
   if (a.c !== b.c) { return false; }
   switch (a.c) {
-    case "Var": return a.index == b.index;
-    case "Ref": return a.name == b.name;
+    case "Var": return a.index === b.index;
+    case "Ref": return a.name === b.name;
     case "All":
       acc.push([a.dom,b.dom] , [a.cod,b.cod]);
       break;
@@ -136,7 +140,7 @@ function equals(u, v) {
   const acc = [ [u,v] ];
   while (acc.length > 0) {
     const [a,b] = acc.pop();
-    if (a == b) { continue; }
+    if (a === b) { continue; }
     if (!same_head(a,b,acc)) { return false; }
   }
   return true;
@@ -171,13 +175,15 @@ function subst(term, val, depth=0) {
 ///////////////////         Meta terms        //////////////////
 ////////////////////////////////////////////////////////////////
 
-// Meta-variables substitution
-// The map is an object whose keys are meta-variable names
-// and values are arrays of shifted terms to substitute
-function meta_subst(term, args) {
+/** Meta-variables substitution
+ *
+ * Relies on a map associating each meta-variable name
+ * to (an array of memoised shifted) term(s) with which to substitute.
+ */
+function meta_subst(term, subst) {
   // Shift memoisation : maps metavar name to multiple shifted values
   const map = new Map();
-  args.forEach((v,k)=>map.set(k,[v]));
+  subst.forEach((v,k)=>map.set(k,[v]));
   function ms(t,d) {
     switch (t.c) {
       case "MVar":

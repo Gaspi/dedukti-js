@@ -150,8 +150,8 @@ mem_col  : ind -> ind -> ind -> sudo -> bool;
 
 mem_squ  : ind -> ind -> ind -> sudo -> bool;
 : mem_squ i j k s -->
-  (i':ind =>
-   j':ind =>
+  (i' : ind := trunc3 i) =>
+  (j' : ind := trunc3 j) =>
     (or (eq (get i'         j'         s) k)
     (or (eq (get (S i')     j'         s) k)
     (or (eq (get (S (S i')) j'         s) k)
@@ -160,9 +160,7 @@ mem_squ  : ind -> ind -> ind -> sudo -> bool;
     (or (eq (get (S (S i')) (S j')     s) k)
     (or (eq (get i'         (S (S j')) s) k)
     (or (eq (get (S i')     (S (S j')) s) k)
-        (eq (get (S (S i')) (S (S j')) s) k)))))))))
-  )
-  (trunc3 i) (trunc3 j);
+        (eq (get (S (S i')) (S (S j')) s) k)))))))));
 
 
 check : ind -> ind -> ind -> sudo -> bool :=

@@ -12,6 +12,9 @@ T: Ty -> Type;
 app: a:Ty -> b:Ty ->  T (arr a b) -> (T a -> T b);
 lam: a:Ty -> b:Ty -> (T a -> T b) ->  T (arr a b);
 
+// `(x:T := d) => t`  is an alias for  `( (x:T=>t) d )`
+#EVAL (x:Nat:=s z)=>s x;
+
 // Dedukti supports non-linearity
 // We recommend to avoid this feature if possible as it quickly leads
 // to loss of confluence, product compatibility and subject reduction
@@ -25,7 +28,6 @@ min: Nat -> Nat -> Nat;
 : min n[] n --> n;
 #CHECK x : Nat |- min x x     == x;
 #CHECK x : Nat |- min x (s x) != x;
-
 
 // A meta-variable that is only applied to some (not all) of the
 // available locally bounded variable will only match expressions
@@ -107,12 +109,3 @@ f (t:Ty) (x:T t) : T (arr t t):= lam t t (z => x);
 #REQUIRE "https://gaspi.github.io/examples/theories/pure_lambda_calculus.dk"[lc];
 #INFER lc.lam;
 // Note : beware of CORS headers preventing such ressource to be received by the webpage.
-
-
-// My own TODO:
-// - Move "Output" to a dedicated tab
-// - Add a list of imports in the left pane
-//   > can be filled with load button
-//   > entries can be removed
-// - Add typechecking status to imports (only type checked can be imported)
-// - Add "typecheck all" button
