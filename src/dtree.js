@@ -122,7 +122,6 @@ function compute_matching_problem(row,depths,def=null) {
 }
 
 
-
 function pp_dtrees(dtrees) {
   let res = "Count arguments:\n";
   function pp(t,s) { res+='  '.repeat(t)+s+"\n"; }

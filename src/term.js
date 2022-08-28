@@ -175,6 +175,7 @@ function subst(term, val, depth=0) {
 ///////////////////         Meta terms        //////////////////
 ////////////////////////////////////////////////////////////////
 
+
 /** Meta-variables substitution
  *
  * Relies on a map associating each meta-variable name
@@ -182,20 +183,32 @@ function subst(term, val, depth=0) {
  */
 function meta_subst(term, subst) {
   // Shift memoisation : maps metavar name to multiple shifted values
+  let ct = 0; // Compteur de substitutions
   const map = new Map();
   subst.forEach((v,k)=>map.set(k,[v]));
   function ms(t,d) {
-    switch (t.c) {
-      case "MVar":
-        const args = t.args.map((t)=>ms(t,d));
-        const s = map.get(t.name);
-        if (!s) { return MVar(t.name,args); }
-        if (!s[d]) { s[d] = shift(s[0],inc=d); }
-        return meta_subst(s[d], args);
-      case "All" : return All(t.name, ms(t.dom,d) , ms(t.cod,d+1) );
-      case "Lam" : return Lam(t.name, t.type && ms(t.type,d) , ms(t.body,d+1) );
-      case "App" : return App( ms(t.func,d) , ms(t.argm,d) );
-      default: return t;
+    const cta = ct;
+    if (t.c === "MVar") {
+      const args = t.args.map((t)=>ms(t,d));
+      const s = map.get(t.name);
+      if (!s) { return (ct === cta && t) || MVar(t.name,args); }
+      ct += 1; // Substitution effectuée
+      if (!s[d]) { s[d] = shift(s[0],inc=d); }
+      return meta_subst(s[d], args);
+    } else if (t.c === "All") {
+      const dom = ms(t.dom, d  );
+      const cod = ms(t.cod, d+1);
+      return (ct === cta && t) || All(t.name, dom, cod);
+    } else if (t.c === "Lam") {
+      const type = t.type && ms(t.type, d  );
+      const body =           ms(t.body, d+1);
+      return (ct === cta && t) || Lam(t.name,type,body);
+    } else if (t.c === "App") {
+      const func = ms(t.func,d);
+      const argm = ms(t.argm,d);
+      return (ct === cta && t) || App(func,argm);
+    } else {
+      return t;
     }
   }
   return ms(term,0);
@@ -208,7 +221,7 @@ function get_meta_match(args) {
   const res = {};
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a.c!='Var') { fail("MetaMatch","Expected a locally bounded variable, got:"+pp_term(a)); }
+    if (a.c !== 'Var') { fail("MetaMatch","Expected a locally bounded variable, got:"+pp_term(a)); }
     if (res[a.index]) { fail("MetaMatch","Expected distinct variables, got "+pp_term(a)+"twice"); }
     res[a.index] = MVar(i);
   }

@@ -83,7 +83,7 @@ class ReductionEngine {
   // Updates the [state] Array in place
   nf_state(state) {
     const [head,stack] = this.whnf_state(state);
-    for (let i=0; i<stack.length;i++) { stack[i] = this.nf(stack[i]); };
+    for (let i=0; i < stack.length; i++) { stack[i] = this.nf(stack[i]); };
     switch (head.c) {
       case "All":
         head.dom = this.nf(head.dom);
@@ -109,7 +109,7 @@ class ReductionEngine {
       const [head,stack] = state;
       switch (head.c) {
         case "Lam":
-          if (stack.length == 0) { return state; } // Unapplied lambda
+          if (stack.length === 0) { return state; } // Unapplied lambda
           const [rhead, rstack] = to_state( subst(head.body, stack.pop()) );
           state[0] = rhead;
           state[1] = stack.concat(rstack);
@@ -146,7 +146,7 @@ class ReductionEngine {
   // Running the dtree using the given arguments (in reverse order)
   exec_dtree(dtree, stack) {
     if (!dtree) { return [null,null]; }
-    if (dtree.c == 'Switch') {
+    if (dtree.c === 'Switch') {
       const hstate = to_state(stack[dtree.index])
       const [head,hstack] = this.whnf_state(hstate);
       switch (head.c) {
@@ -170,7 +170,7 @@ class ReductionEngine {
           return this.exec_dtree(dtree.def,stack);
         default: fail("DTreeExec","Unexpected constructor in switch case: "+head.c);
       }
-    } else if (dtree.c == 'Test') {
+    } else if (dtree.c === 'Test') {
       const subst = new Map();
       let m, matched;
       for (let i = 0; i < dtree.match.length; i++) {
