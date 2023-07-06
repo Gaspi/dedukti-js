@@ -53,6 +53,8 @@ function CmdCheckConv(ln,ctx,lhs,rhs,cv) { return {c:'CheckConv', ln, ctx,lhs,rh
 function CmdPrint(ln,term)               { return {c:'Print'    , ln, term               }; }
 function CmdDTree(ln,name)               { return {c:'DTree'    , ln, name               }; }
 function CmdTime(ln)                     { return {c:'Time'     , ln                     }; }
+function CmdDebugOn(ln)                  { return {c:'DebugOn'  , ln                     }; }
+function CmdDebugOff(ln)                 { return {c:'DebugOff' , ln                     }; }
 
 
 // Shifts variables deeper than [depth] by [inc] in the term [term]

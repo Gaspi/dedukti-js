@@ -1,3 +1,4 @@
 @ECHO OFF
 START http://localhost:8000/index.html
-python -m http.server
+rem python -m http.server
+http-server -p 8000

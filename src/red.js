@@ -113,12 +113,10 @@ class ReductionEngine {
           const [rhead, rstack] = to_state( subst(head.body, stack.pop()) );
           state[0] = rhead;
           state[1] = stack.concat(rstack);
-          //console.log("WHNF: Beta");
           break;
         case "Ref": // Rewriting
           const rule_name = this.head_rewrite(state);
           if (!rule_name) { return state; }
-          //console.log("WHNF: ",rule_name);
           break;
         default: return state; // Any other construction
       }

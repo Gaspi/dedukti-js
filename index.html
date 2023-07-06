@@ -6,8 +6,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="shortcut icon" type="image/png" href="ressources/favicon.png"/>
   <!-- Leaflet and Bootstrap: CSS style -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/fontawesome.min.css">
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/fontawesome.min.css"
+    onerror="this.onerror=null;this.href='lib/fontawesome.min.css';">
+  <link rel="stylesheet"
+    href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z"
+    crossorigin="anonymous"
+    onerror="this.onerror=null;this.href='lib/bootstrap.min.css';">
   <!-- Syntax coloring: CSS style -->
   <link rel="stylesheet" href="ressources/main.css">
   <link rel="stylesheet" href="ressources/syntax_coloring.css">
@@ -62,7 +68,11 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+<script src="lib/bootstrap.bundle.min.js"
+  integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+  crossorigin="anonymous"
+  onerror="this.onerror=null;this.integrity=null;this.src='lib/bootstrap.bundle.min.js';"
+  ></script>
 <script src="src/utils.js"></script>
 <script src="src/term.js"></script>
 <script src="src/context.js"></script>
@@ -180,15 +190,13 @@ function set_button_mode(mode) {
 function check_editor() {
   set_button_mode('checking');
   setTimeout(function() {
-    //try {
+    try {
       process_all_instructions();
       set_button_mode('checked');
-    /*
     } catch(e) {
       log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");
       set_button_mode('error');
     }
-    //*/
   }, 10);
 }
 
@@ -265,11 +273,11 @@ function log(status,ln,title,msg) {
   div.innerHTML = (ln?ln+": ":"")+'<strong>['+title+']</strong> '+msg;
   div.classList.add('p-1', 'm-2', 'alert');
   const tag = {
-      ok  :'success',
-      info:'info',
-      warn:'warning',
-      err :'danger',
-    }[status];
+    ok  :'success',
+    info:'info',
+    warn:'warning',
+    err :'danger',
+  }[status];
   div.classList.add('alert-'+tag);
   logs.appendChild(div);
   if (ln>0) {

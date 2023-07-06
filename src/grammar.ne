@@ -51,6 +51,8 @@ const lexer = makeLexer({
     CMD_PRINT:"#PRINT",
     CMD_DTREE:"#DTREE",
     CMD_TIME :"#TIME",
+    CMD_DEBUGON :"#DEBUGON",
+    CMD_DEBUGOFF:"#DEBUGOFF",
     DB_INDEX:/\#[0-9]+/,
     MID: /"[^"]*"/,
     QID: /(?:[a-zA-Z0-9_!?'/@]+\.)+[a-zA-Z0-9_!?'/@]+/,
@@ -85,6 +87,8 @@ line ->
   | %CMD_PRINT  term                            e {% ([,t            ,e]) => CmdPrint(e,t)                     %}
   | %CMD_DTREE id                               e {% ([,id           ,e]) => CmdDTree(e,id)                    %}
   | %CMD_TIME                                   e {% ([              ,e]) => CmdTime(e)                        %}
+  | %CMD_DEBUGON                                e {% ([              ,e]) => CmdDebugOn(e)                     %}
+  | %CMD_DEBUGOFF                               e {% ([              ,e]) => CmdDebugOff(e)                    %}
 
 id  -> %ID  {% ([id ]) =>  id.value %}
 mid -> %MID {% ([mid]) => mid.value.substring(1,mid.value.length-1)  %}

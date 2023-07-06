@@ -160,7 +160,6 @@ class Signature {
           log('info',ins.ln,'Show',pp_term(ins.term));
           break;
         case "DTree":
-        console.log(ins);
           log('info',ins.ln,'DTree',"Decision tree for symbol `"+ins.name+"`:\n"+pp_dtrees(this.red.get(ins.name).decision_trees));
           break;
         case "Time":
@@ -178,6 +177,12 @@ class Signature {
             ins.alias ? ins.alias+(namespace&&'.')+namespace : namespace
           );
           log('ok',ins.ln,'Require',"Module `"+ins.module+"` successfully loaded.");
+          break;
+        case "DebugOn":
+          debug.enable_log();
+          break;
+        case "DebugOff":
+          debug.disable_log();
           break;
         default:
           fail("Instruction","Unexpected instruction constructor:"+ins.c);
