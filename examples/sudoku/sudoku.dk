@@ -61,6 +61,7 @@ not : bool -> bool;
 : not F --> T;
 
 eq : ind -> ind -> bool;
+// A simple non-linear rule that could be replaced with exhaustive case analysis
 : eq x x --> T;
 : eq x y --> F;
 
@@ -184,9 +185,9 @@ iffail : solution -> solution -> solution;
 : iffail fail     d --> d;
 
 solve : ind -> ind -> ind -> sudo -> solution;
-:     solve i X * s --> solve (S i) 1 1 s;
-:     solve X * * s --> success s;
-:   solve i j X s --> fail;
+: solve i X * s --> solve (S i) 1 1 s;
+: solve X * * s --> success s;
+: solve i j X s --> fail;
 : solve i j k s -->
   ite
     (eq (get i j s) X)

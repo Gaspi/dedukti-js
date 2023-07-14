@@ -75,6 +75,13 @@ class ReductionEngine {
     return dts[arity];
   }
   
+  // Ideas : add a depth d to states to allow easy lambda deconstruction
+  // Add a depth map to states in WHNF : shifting memoisation of terms
+  // Ensure term sharing is preserved by non-modifying shifting and (meta-)substitions
+  // Use a single function for shifting under depth + subst + meta subst (one pass).
+  // Add memoisation of term representation (for sharing) and of whnf state (true/false)
+  // Move all this to a class
+  
   // Reduces a term until a normal form is found
   whnf(term) { return from_state( this.whnf_state( to_state(term) ) ); }
     nf(term) { return from_state( this.nf_state(   to_state(term) ) ); }
@@ -102,21 +109,39 @@ class ReductionEngine {
     return [head,stack];
   }
   
-  // Computes the weak head normal form of term given in state representation: [head,stack]
-  // Updates the [state] Array in place
+  /** Computes the weak head normal form of term given in state representation: [head,stack,subst,meta_subst]
+    * Updates the [state] Array in place
+    * [subst] and [meta_subst] may be shared among states and must not be modified in place
+    * [head] is a term and should not be modified, only deconstructed
+    * [stack] can be modified in place, it is never shared
+    */
   whnf_state(state) {
     while (true) {
-      const [head,stack] = state;
+      const [head,stack,subst,msubst,depth] = state;
       switch (head.c) {
-        case "Lam":
-          if (stack.length === 0) { return state; } // Unapplied lambda
-          const [rhead, rstack] = to_state( subst(head.body, stack.pop()) );
-          state[0] = rhead;
-          state[1] = stack.concat(rstack);
+        case "App":
+          // Push the state version of the argument on the stack
+          stack.push( [head.argm,[],subst,msubst,depth] );
+          state[0]=head.func;
           break;
-        case "Ref": // Rewriting
+        case "Lam":
+          // Unapplied lambda is a WHNF
+          if (stack.length === 0) { return state; }
+          // Otherwise add the top stack argument to the substitution
+          // and compute the WHNF of the body (\x.t) u1 u2 ... --> t[x\u1] u2 ...
+          state[0] = head.body;
+          state[2] = [...state[2], stack.pop()];
+          break;
+        case "Ref": // Potential redex
           const rule_name = this.head_rewrite(state);
+          // If rewriting occured, proceed with current state, otherwise return
           if (!rule_name) { return state; }
+          break;
+        case "MVar":
+          
+          break;
+        case "Var":
+          if head.index subst.length
           break;
         default: return state; // Any other construction
       }
@@ -135,9 +160,15 @@ class ReductionEngine {
     // Running the decision tree with the given args (in order)
     let [rule, subst] = this.exec_dtree(dtree.tree,truncated_stack);
     if (!rule) { return null; }
+    /*// TODO: deleteme
     const [rhead, rstack] = to_state( meta_subst(rule.rhs, subst) );
     state[0] = rhead;
     state[1] = stack.slice(0,stack.length-rule.stack.length).concat(rstack);
+    //*/
+    state[0] = rule.rhs;
+    state[1] = stack.slice(0,stack.length-rule.stack.length);
+    state[2] = [];
+    state[3] = subst;
     return rule.name;
   }
   
@@ -145,18 +176,19 @@ class ReductionEngine {
   exec_dtree(dtree, stack) {
     if (!dtree) { return [null,null]; }
     if (dtree.c === 'Switch') {
-      const hstate = to_state(stack[dtree.index])
-      const [head,hstack] = this.whnf_state(hstate);
+      const [head,hstack,subst,msubst] = this.whnf_state(stack[dtree.index]);
       switch (head.c) {
         case 'Lam':
           if (!dtree.Lam) { return this.exec_dtree(dtree.def,stack); }
-          stack.push(head.body);
+          stack.push( [head.body,[],subst,msubst] );
           return this.exec_dtree(dtree.Lam,stack);
         case 'Ref':
           if (!dtree.Ref                          ) { return this.exec_dtree(dtree.def,stack); }
           if (!dtree.Ref[head.name]               ) { return this.exec_dtree(dtree.def,stack); }
           if (!dtree.Ref[head.name][hstack.length]) { return this.exec_dtree(dtree.def,stack); }
           hstack.forEach((e)=>stack.push(e));
+          
+          // TODO: 
           return this.exec_dtree(dtree.Ref[head.name][hstack.length],stack);
         case 'Var':
           if (!dtree.Var                           ) { return this.exec_dtree(dtree.def,stack); }
@@ -178,7 +210,7 @@ class ReductionEngine {
         } catch(e) {
           if (e.title == 'MetaMatchFailed') {
             try {
-              matched = meta_match( this.nf(stack[m.index]), m.args, m.depth);
+              matched = meta_match( this.nf_state(stack[m.index]), m.args, m.depth);
             } catch(e) {
               if (e.title == 'MetaMatchFailed') {
                 return this.exec_dtree(dtree.def, stack);

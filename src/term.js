@@ -24,9 +24,40 @@ function get_head(t) {
   return [t,args];
 }
 
-// Conversion to/from state representation: [head,stack]
-function to_state(term) { return get_head(term); }
-function from_state([head,stack]) { return stack.reduceRight(App,head); }
+/** Conversion to state representation: [head,stack,subst,meta_subst]
+ *  A state [ t, [s2,s1,s0], [s3,s4], {X:s5}, d]
+ * represents the term:
+ *   t{ X=(tos s5) }{_[0] = (tos s3), _[1]=(tos s4)} (tos s0) (tos s1) (tos s2)
+ * TODO: should subst and meta_subst commute ? Should only one be non-empty ?
+ * Should one be only extended if the other is empty ? Should one be extended by a substituted version ?
+ */
+function to_state(term) {
+  return [term,[],[],new Map(), 0];
+  /* //TODO:deleteme
+  return get_head(term).concat([ [], {} ]);
+  //*/
+}
+
+/** Conversion to/from state representation: [head,stack,subst,meta_subst]
+ *  A state [ t, [s2,s1,s0], [s3,s4], {X:s5} ]
+ * represents the term:
+ *   t{_[0] = (tos s3), _[1]=(tos s4)}{ X=(tos s5) } (tos s0) (tos s1) (tos s2)
+ * TODO: should subst and meta_subst commute ? Should only one be non-empty ?
+ * Should one be only extended if the other is empty ? Should one be extended by a substituted version ?
+ */
+function from_state([head, stack, subst, meta_subst, depth]) {
+  // Compute the substitution
+  let t = head;
+  if (meta_subst.length) {
+    t = meta_subst(t, meta_subst, 0, from_state);
+  }
+  if (subst.length) {
+    t = subst_l(t, subst, 0, from_state);
+  }
+  
+  // TODO: Finish work
+  return stack.map(from_state).reduceRight(App, shift(t,depth) );
+}
 
 
 // Pre-scoping objects that can be either references or locally bounded variables
@@ -148,9 +179,10 @@ function equals(u, v) {
   return true;
 }
 
-// Substitutes [val] for variable with DeBruijn index [depth]
-// and downshifts all variables referencing beyond that index:
-// subst(  y#0 \x.(x#0 y#1 z#2) , v#9 )  :=  v#8 \x.(x#0 v#9 z#1)
+/** Substitutes [val] for variable with DeBruijn index [depth]
+ *  and downshifts all variables referencing beyond that index:
+ *    subst(  y#0 \x.(x#0 y#1 z#2) , v#9 )  :=  v#8 \x.(x#0 v#9 z#1)
+ */
 function subst(term, val, depth=0) {
   // Shifts memoisation
   const shifts = [val];
@@ -173,6 +205,41 @@ function subst(term, val, depth=0) {
   return s(term,depth);
 }
 
+/** Substitutes each [vals[i]] for variables with DeBruijn index [depth+i]
+ *  and downshifts all variables referencing beyond that index:
+ * subst(  y#0 \x.(x#0 y#1 z#2) , v#9 )  :=  v#8 \x.(x#0 v#9 z#1)
+ * Lazily applies the function [to_term] at most one to all vals
+ */
+function subst_l(term, vals, depth=0, to_term=(t)=>t) {
+  // Shifts memoisation
+  const shifts_arr = Array(vals.length).fill([]);
+  const nbvals = vams.length;
+  function s(t,d) {
+    switch (t.c) {
+      case "Var":
+        nbvals
+        if (t.index >= d+nbvals) {
+          return Var(t.index - nbvals);
+        } else if (t.index < d) {
+          return t;
+        } else {
+          const shifts = shifts_arr[t.index-d];
+          if (!shifts[d]) {
+          if (!shifts.length) { shifts[0] = to_term( vals[t.index-d] ); }
+            shifts[d] = shift(shifts[0] ,inc=d);
+          }
+          return shifts[d];
+        }
+      case "All" : return All(t.name, s(t.dom,d) , s(t.cod,d+1) );
+      case "Lam" : return Lam(t.name, t.type && s(t.type,d) , s(t.body,d+1) );
+      case "App" : return App( s(t.func,d) , s(t.argm,d) );
+      case "MVar": return MVar(t.name, t.args.map((t)=>s(t,d)) );
+      default: return t;
+    }
+  }
+  return s(term,depth);
+}
+
 ////////////////////////////////////////////////////////////////
 ///////////////////         Meta terms        //////////////////
 ////////////////////////////////////////////////////////////////
@@ -183,20 +250,23 @@ function subst(term, val, depth=0) {
  * Relies on a map associating each meta-variable name
  * to (an array of memoised shifted) term(s) with which to substitute.
  */
-function meta_subst(term, subst) {
+function meta_subst(term, subst, depth=0, to_term=(t)=>t) {
   // Shift memoisation : maps metavar name to multiple shifted values
   let ct = 0; // Compteur de substitutions
   const map = new Map();
-  subst.forEach((v,k)=>map.set(k,[v]));
+  subst.forEach((v,k)=>map.set(k,[]));
   function ms(t,d) {
     const cta = ct;
     if (t.c === "MVar") {
       const args = t.args.map((t)=>ms(t,d));
-      const s = map.get(t.name);
-      if (!s) { return (ct === cta && t) || MVar(t.name,args); }
+      const shifts = map.get(t.name);
+      if (!shifts) { return (ct === cta && t) || MVar(t.name,args); }
       ct += 1; // Substitution effectuée
-      if (!s[d]) { s[d] = shift(s[0],inc=d); }
-      return meta_subst(s[d], args);
+      if (!shifts[d]) {
+        if (!shifts.length) { shifts[0] = to_term(subst[t.name]); }
+        shifts[d] = shift(shifts[0], inc=d);
+      }
+      return meta_subst(shifts[d], args);
     } else if (t.c === "All") {
       const dom = ms(t.dom, d  );
       const cod = ms(t.cod, d+1);
@@ -213,7 +283,7 @@ function meta_subst(term, subst) {
       return t;
     }
   }
-  return ms(term,0);
+  return ms(term,depth);
 }
 
 /** Checks that given [args] are distinct locally bounded variables [a_0, ..., a_n]
@@ -239,7 +309,7 @@ function meta_match(term, map, depth) {
       case "Var":
         if (t.index < d || depth == 0) { return t; }
         if (t.index >= d + depth) { return Var(t.index-depth, t.preferred_name); }
-        const m = map[t.index -d];
+        const m = map[t.index - d];
         if (m) { return  m; }
         else { fail('MetaMatchFailed',""); }
       case "All" : return All(t.name, mm(t.dom,d), mm(t.cod,d+1));
