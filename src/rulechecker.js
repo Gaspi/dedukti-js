@@ -47,6 +47,50 @@ function is_non_pattern_instance(term) {
   return false;
 }
 
+
+/** Meta-variables substitution
+ * 
+ * Relies on a map associating each meta-variable name
+ * to (an array of memoised shifted) term(s) with which to substitute.
+ */
+function meta_map_subst(term, subst, depth=0, to_term=(t)=>t) {
+  // Shift memoisation : maps metavar name to multiple shifted values
+  let ct = 0; // Compteur de substitutions
+  const map = new Map();
+  subst.forEach((v,k)=>map.set(k,[]));
+  function ms(t,d) {
+    const cta = ct;
+    if (t.c === "MVar") {
+      const args = t.args.map((t)=>ms(t,d));
+      const shifts = map.get(t.name);
+      if (!shifts) { return (ct === cta ? t : MVar(t.name,args)); }
+      ct += 1; // Substitution effectuée
+      if ( !(shifts instanceof Array) ) {
+        return meta_map_subst(shifts, args);
+      } else if (!shifts[d]) {
+        if (!shifts.length) { shifts[0] = to_term(subst[t.name]); }
+        shifts[d] = shift(shifts[0], inc=d);
+      }
+      return meta_map_subst(shifts[d], args);
+    } else if (t.c === "All") {
+      const dom = ms(t.dom, d  );
+      const cod = ms(t.cod, d+1);
+      return (ct === cta && t) || All(t.name, dom, cod);
+    } else if (t.c === "Lam") {
+      const type = t.type && ms(t.type, d  );
+      const body =           ms(t.body, d+1);
+      return (ct === cta && t) || Lam(t.name,type,body);
+    } else if (t.c === "App") {
+      const func = ms(t.func,d);
+      const argm = ms(t.argm,d);
+      return (ct === cta && t) || App(func,argm);
+    } else {
+      return t;
+    }
+  }
+  return ms(term,depth);
+}
+
 // Typing and convertion assumptions mechanisms
 class AssumptionSet {
   constructor(red) {
@@ -61,7 +105,7 @@ class AssumptionSet {
     return t.c==='Var' || (t.c==='Ref' && this.red.is_injective(t.name));
   }
   
-  msubst(t) { return meta_subst(t, this.subst); }
+  msubst(t) { return meta_map_subst(t, this.subst); }
   
   // Check wether the terms can be decided convertible using the given assumptions
   are_convertible(t1,t2) {
@@ -90,7 +134,7 @@ class AssumptionSet {
         // Extend the substitution S
         S.set('!'+index, match);
         // Apply the extended S to the LHS of the remaining conversion checks
-        acc.forEach(function(c) { c[0] = meta_subst(c[0],S); });
+        acc.forEach(function(c) { c[0] = meta_map_subst(c[0],S); });
         continue;
       }
       if (!same_head_with_depth(whnfa, this.red.whnf(b), d,acc)) { return false; }
@@ -110,7 +154,7 @@ class AssumptionSet {
     // Build the meta-subst {X => b}
     const aux = new Map([[x, val]]);
     // Apply {X => b} to the current substitution
-    this.subst.forEach((v,k)=> this.subst.set(k, meta_subst(v,aux)) );
+    this.subst.forEach((v,k)=> this.subst.set(k, meta_map_subst(v,aux)) );
     // Extend the substitution
     this.subst.set(x, val);
     // Forget all previous assumptions
@@ -245,7 +289,7 @@ class RuleChecker {
           const i = unchecked.findIndex((t,i)=>t && S.has('!'+i));
           if (i < 0) { return true; } // if there are none, then the work is done: proceed
           // else compute the expected type substituted with the partial substitution S
-          const type_of_ith = meta_subst(assumption.ctx[i],S);
+          const type_of_ith = meta_map_subst(assumption.ctx[i],S);
           // Infer the type of the value substituted with i in S
           const inferred_type = self.rhs_infer(assumptions, S.get('!'+i), ctx);
           // Check that this value S[i] has the expected type...
@@ -255,7 +299,7 @@ class RuleChecker {
           unchecked[i] = false; // Never check this index again
         }
         while (!aux(this)) {}
-        const inf_final_type = meta_subst(assumption.type, S);
+        const inf_final_type = meta_map_subst(assumption.type, S);
         if (!expected_type) { return inf_final_type; }
         // If we need to check a type for the result, then unify the inferred one
         // allowing for even further extension of S

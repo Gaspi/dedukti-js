@@ -245,73 +245,62 @@ function subst_l(term, vals, depth=0, to_term=(t)=>t) {
 ////////////////////////////////////////////////////////////////
 
 
-/** Meta-variables substitution
- *
- * Relies on a map associating each meta-variable name
- * to (an array of memoised shifted) term(s) with which to substitute.
- */
-function meta_subst(term, subst, depth=0, to_term=(t)=>t) {
-  // Shift memoisation : maps metavar name to multiple shifted values
-  let ct = 0; // Compteur de substitutions
-  const map = new Map();
-  subst.forEach((v,k)=>map.set(k,[]));
-  function ms(t,d) {
-    const cta = ct;
-    if (t.c === "MVar") {
-      const args = t.args.map((t)=>ms(t,d));
-      const shifts = map.get(t.name);
-      if (!shifts) { return (ct === cta && t) || MVar(t.name,args); }
-      ct += 1; // Substitution effectuée
-      if (!shifts[d]) {
-        if (!shifts.length) { shifts[0] = to_term(subst[t.name]); }
-        shifts[d] = shift(shifts[0], inc=d);
-      }
-      return meta_subst(shifts[d], args);
-    } else if (t.c === "All") {
-      const dom = ms(t.dom, d  );
-      const cod = ms(t.cod, d+1);
-      return (ct === cta && t) || All(t.name, dom, cod);
-    } else if (t.c === "Lam") {
-      const type = t.type && ms(t.type, d  );
-      const body =           ms(t.body, d+1);
-      return (ct === cta && t) || Lam(t.name,type,body);
-    } else if (t.c === "App") {
-      const func = ms(t.func,d);
-      const argm = ms(t.argm,d);
-      return (ct === cta && t) || App(func,argm);
-    } else {
-      return t;
-    }
-  }
-  return ms(term,depth);
-}
+// Note : meta-substitution are done "by name" > avoid capture !
+//     f X[] Y[] { X => t, Y => u } --> f t u
+// meta-variable instantiation is done "by DB index"
+//     X[t,u] { X[x,y] => f x y } --> f x[0] y[1] { [0] => t, [1] => u }
 
-/** Checks that given [args] are distinct locally bounded variables [a_0, ..., a_n]
-    Returns the substitution { a_0 : MVar(0), ... , a_n : MVar(n) }
+/** Checks that given term array [args] are distinct locally bounded variables [a_0, ..., a_n]
+    Returns an array A such that:
+    - A[a_i] is an unnamed var of index i
+    - A[b] is undefined for all variables b distinct from the a_i
+    Example:
+    Input:
+      args = [ z[2], y[0] ]
+      depth = 3
+    Ouput:
+      [ 1, undefined, 0 ]
 */
-function get_meta_match(args) {
-  const res = {};
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a.c !== 'Var') { fail("MetaMatch","Expected a locally bounded variable, got:"+pp_term(a)); }
-    if (res[a.index]) { fail("MetaMatch","Expected distinct variables, got "+pp_term(a)+"twice"); }
-    res[a.index] = MVar(i);
-  }
+function get_meta_match(args, depth) {
+  const res = new Array(depth);
+  args.forEach( function (a,i) {
+    if (a.c !== 'Var' || a.index >= depth) {
+      fail("MetaMatch","Expected a locally bounded variable, got:"+pp_term(a));
+    } else if (res[a.index] != undefined) {
+      fail("MetaMatch","Expected distinct variables, got "+pp_term(a)+"twice");
+    } else {
+      res[a.index] = i;
+    }
+  });
   return res;
 }
 
 /** Matches all variables in [term] to the corresponding meta variable in [map]
-    Variables beyond [depth] are shifted down by [depth], others raise an error.
+    Variables beyond [depth] are shifted down by [depth], others raise an error if unmatched.
+    Example:
+      Input:
+        term = x:A -> f x[0] y[1] z[3] u[4]
+        map = [ 1, undefined, 0 ]
+        arity = 2
+        depth = 3
+      Output:
+        x:A -> f x[0] ?[2] ?[1] u[3]
+      This would be used to perform to the matching of the term
+      again some pattern X[ z[2], y[0] ]
 */
-function meta_match(term, map, depth) {
+function meta_match(term, map, arity, depth) {
+  if (depth == 0) { return term; }
   function mm(t,d) {
     switch (t.c) {
       case "Var":
-        if (t.index < d || depth == 0) { return t; }
-        if (t.index >= d + depth) { return Var(t.index-depth, t.preferred_name); }
-        const m = map[t.index - d];
-        if (m) { return  m; }
-        else { fail('MetaMatchFailed',""); }
+        if (t.index < d) { return t; }
+        if (t.index >= d + depth) { return Var(t.index-depth+arity, t.preferred_name); }
+        const i = map[t.index - d];
+        if (i === undefined) {
+          fail('MetaMatchFailed',"Unexpected locally bounded variable ["+pp_term(t)+"]." );
+        } else {
+          return Var(i+d);
+        }
       case "All" : return All(t.name, mm(t.dom,d), mm(t.cod,d+1));
       case "Lam" : return Lam(t.name, t.type && mm(t.type,d) , mm(t.body,d+1) );
       case "App" : return App( mm(t.func,d) , mm(t.argm,d) );

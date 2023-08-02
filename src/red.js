@@ -11,6 +11,134 @@ function filter_rules(rules,arity) {
   return [ res , max ];
 }
 
+/** A term representation with:
+    - with easy access to its head
+    - reducable in place
+    - includes a meta-substition and a variable substitution
+ */
+class State {
+  constructor(term, ctxt = new Context()) {
+    this.head = term;
+    // The stack may be modified in place
+    this.stack = [];
+    // The context may be shared among states and should not be modified in place
+    this.ctxt = ctxt;
+    // Array of shifted term representations of the state. Should be reset every time the state is updated
+    this.terms = [];
+    this.heads = [];
+  }
+  
+  // Term conversion with memoisation of shifted versions of head and global terms to avoid recomputing and have maximum sharing
+  _to_term(s=0) {
+    if (this.state) {
+      // Graph compression
+      if (state.state) {
+        this.state = state.state;
+        this.shift = state.shift+shift;
+      }
+      return this.state.to_term(s+this.shift);
+    }
+    if (!this.heads[s]) {
+      if (!this.heads[0]) {
+        this.heads[0] = this.context.apply(this.head);
+      }
+      this.heads[s] = shift(this.heads[0], s);
+    }
+    return this.stack.map( (e)=>e.to_term(s) ).reduceRight(App, this.heads[s] );
+  }
+  
+  // Memoised version
+  to_term(s=0) {
+    if (!this.terms[s]) {
+      this.terms[s] = this._to_term(s);
+    }
+    return this.terms[s];
+  }
+  
+  // Update state to a special instance refering an other state that should be shifted
+  as_shifted( [state, shift] ) {
+    delete this.head;
+    delete this.stack;
+    delete this.ctxt;
+    delete this.terms;
+    delete this.heads;
+    // Graph compression
+    if (state.state) {
+      this.state = state.state;
+      this.shift = state.shift+shift;
+    } else {
+      this.state = state;
+      this.shift = shift;
+    }
+  }
+}
+
+function eval_to_term(state, dshift) {
+
+  
+  
+}
+
+// A context is a mapping both of meta-variables and variables of a term
+// to states (which can be computed to term if needed)
+// It can be applied to terms.
+class Context {
+  constructor(meta=new Map(), depth=0, subst=[]) {
+    this.meta = meta;
+    this.depth = depth; // Should be equal to the number of null in subst
+    this.subst = subst;
+  }
+  
+  function extend(s) {
+    return new Context( this.meta, this.depth  , this.subst.concat([0,s]), );
+  }
+  
+  function shift_extend() {
+    return new Context( this.meta, this.depth+1, this.subst.map(([d,s]) => [d+1,s] : identity).concat(null), );
+  }
+  
+  apply(term, depth) {
+    // Compteur de substitutions
+    let ct = 0;
+    function e(t,d) {
+      const cta = ct;
+      if (t.c === "MVar") {
+        const args = t.args.map((t)=>e(t,d));
+        const subst_t = this.subst.get(t.name);
+        if (!subst_t) {
+          return (ct === cta ? t : MVar(t.name,args));
+        } else {
+          ct += 1; // Substitution effectuée
+          return meta_map_subst(subst_t.to_term(d+this.depth) , args);
+        }
+      } else if (t.c === "Var") {
+        if (t.index != d) {
+          return Var(t.index - (t.index > d ? 1 : 0));
+        } else {
+          if (!shifts[d]) { shifts[d] = shift(val,inc=d); }
+          return shifts[d];
+        }
+      } else if (t.c === "All") {
+        const dom = e(t.dom, d  );
+        const cod = e(t.cod, d+1);
+        return (ct === cta && t) || All(t.name, dom, cod);
+      } else if (t.c === "Lam") {
+        const type = t.type && e(t.type, d  );
+        const body =           e(t.body, d+1);
+        return (ct === cta && t) || Lam(t.name,type,body);
+      } else if (t.c === "App") {
+        const func = e(t.func,d);
+        const argm = e(t.argm,d);
+        return (ct === cta && t) || App(func,argm);
+      } else {
+        return t;
+      }
+    }
+    return e(term, depth);
+  }
+}
+
+
 class ReductionEngine {
   red = new Map();
   constructor() {}
@@ -83,30 +211,26 @@ class ReductionEngine {
   // Move all this to a class
   
   // Reduces a term until a normal form is found
-  whnf(term) { return from_state( this.whnf_state( to_state(term) ) ); }
-    nf(term) { return from_state( this.nf_state(   to_state(term) ) ); }
+  whnf(term) { return this.whnf_state( new State(term) ).to_term(); }
+    nf(term) { return this.nf_state(   new State(term) ).to_term(); }
   
   // Computes the strong normal form of term given in state representation: [head,stack]
   // Updates the [state] Array in place
   nf_state(state) {
-    const [head,stack] = this.whnf_state(state);
-    for (let i=0; i < stack.length; i++) { stack[i] = this.nf(stack[i]); };
-    switch (head.c) {
+    this.whnf_state(state);
+    for (let i=0; i < state.stack.length; i++) { state.stack[i] = this.nf(state.stack[i]); };
+    switch (state.head.c) {
       case "All":
-        head.dom = this.nf(head.dom);
-        head.cod = this.nf(head.cod);
+        state.head = All(state.head.name, this.nf(state.head.dom), this.nf(state.head.cod));
         break;
       case "Lam":
-        head.type = this.nf(head.type);
-        head.body = this.nf(head.body);
+        state.head = Lam(state.head.name, this.nf(state.head.type), this.nf(state.head.body));
         break;
       case "MVar":
-        for (let i = 0; i < head.args.length; i++) {
-          head.args[i] = this.nf(head.args[i]);
-        }
+        state.head = MVar(state.head.name, state.args.map(this.nf));
         break;
     }
-    return [head,stack];
+    return state;
   }
   
   /** Computes the weak head normal form of term given in state representation: [head,stack,subst,meta_subst]
@@ -117,20 +241,23 @@ class ReductionEngine {
     */
   whnf_state(state) {
     while (true) {
-      const [head,stack,subst,msubst,depth] = state;
-      switch (head.c) {
+      if (state.state) {
+        whnf_state(state.state);
+        return state;
+      }
+      switch (state.head.c) {
         case "App":
           // Push the state version of the argument on the stack
-          stack.push( [head.argm,[],subst,msubst,depth] );
-          state[0]=head.func;
+          state.stack.push( new State(state.head.argm, state.ctxt) );
+          state.head = state.head.func;
           break;
         case "Lam":
           // Unapplied lambda is a WHNF
-          if (stack.length === 0) { return state; }
+          if (state.stack.length === 0) { return state; }
           // Otherwise add the top stack argument to the substitution
           // and compute the WHNF of the body (\x.t) u1 u2 ... --> t[x\u1] u2 ...
-          state[0] = head.body;
-          state[2] = [...state[2], stack.pop()];
+          state.head = state.head.body;
+          state.ctxt = state.ctxt.extend( state.stack.pop()];
           break;
         case "Ref": // Potential redex
           const rule_name = this.head_rewrite(state);
@@ -138,10 +265,14 @@ class ReductionEngine {
           if (!rule_name) { return state; }
           break;
         case "MVar":
-          
+          if (state.ctxt.meta.get( state.head.name ) ) {
+            ...
+          }
           break;
         case "Var":
-          if head.index subst.length
+          if (state.ctxt.subst[state.head.index]) {
+            state.as_shifted( state.ctxt.subst[state.head.index]; );
+          }
           break;
         default: return state; // Any other construction
       }
@@ -158,17 +289,11 @@ class ReductionEngine {
     // Truncate to keep only the first [arity] arguments from the top of the stack
     const truncated_stack = stack.slice(stack.length-dtree.arity);
     // Running the decision tree with the given args (in order)
-    let [rule, subst] = this.exec_dtree(dtree.tree,truncated_stack);
+    let [rule, meta_subst] = this.exec_dtree(dtree.tree,truncated_stack);
     if (!rule) { return null; }
-    /*// TODO: deleteme
-    const [rhead, rstack] = to_state( meta_subst(rule.rhs, subst) );
-    state[0] = rhead;
-    state[1] = stack.slice(0,stack.length-rule.stack.length).concat(rstack);
-    //*/
-    state[0] = rule.rhs;
-    state[1] = stack.slice(0,stack.length-rule.stack.length);
-    state[2] = [];
-    state[3] = subst;
+    state.head = rule.rhs;
+    state.stack = stack.slice(0,stack.length-rule.stack.length);
+    state.ctxt = new Context([], meta_subst);
     return rule.name;
   }
   
@@ -202,19 +327,23 @@ class ReductionEngine {
       }
     } else if (dtree.c === 'Test') {
       const subst = new Map();
-      let m, matched;
       for (let i = 0; i < dtree.match.length; i++) {
-        m = dtree.match[i];
-        try {
-          matched = meta_match( stack[m.index], m.args, m.depth);
-        } catch(e) {
-          if (e.title == 'MetaMatchFailed') {
-            try {
-              matched = meta_match( this.nf_state(stack[m.index]), m.args, m.depth);
-            } catch(e) {
-              if (e.title == 'MetaMatchFailed') {
-                return this.exec_dtree(dtree.def, stack);
-              } else { throw e; }
+        let m = dtree.match[i];
+        let matched = stack[m.index];
+        if (!m.joker_match) { // TODO : implement joker match
+          // In case of "joker match" (meta var fully applied to locally bounded *in the DB index order*) :
+          // the state is already the matched version
+          try {
+            matched = meta_match(matched.to_term(), m.args);
+          } catch(e) {
+            if (e.title == 'MetaMatchFailed') {
+              try {
+                matched = meta_match( this.nf_state(matched).to_term(), m.args);
+              } catch(e) {
+                if (e.title == 'MetaMatchFailed') {
+                  return this.exec_dtree(dtree.def, stack);
+                } else { throw e; }
+              }
             }
           }
         }
