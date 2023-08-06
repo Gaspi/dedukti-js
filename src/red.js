@@ -60,7 +60,6 @@ class State {
     delete this.head;
     delete this.stack;
     delete this.ctxt;
-    delete this.terms;
     delete this.heads;
     // Graph compression
     if (state.state) {
@@ -71,12 +70,6 @@ class State {
       this.shift = shift;
     }
   }
-}
-
-function eval_to_term(state, dshift) {
-
-  
-  
 }
 
 // A context is a mapping both of meta-variables and variables of a term
@@ -90,11 +83,11 @@ class Context {
   }
   
   function extend(s) {
-    return new Context( this.meta, this.depth  , this.subst.concat([0,s]), );
+    return new Context( this.meta, this.depth  , this.subst.concat(s) );
   }
   
   function shift_extend() {
-    return new Context( this.meta, this.depth+1, this.subst.map(([d,s]) => [d+1,s] : identity).concat(null), );
+    return new Context( this.meta, this.depth+1, this.subst.map((s) => new State().as_shifted([s,1])).concat(null), );
   }
   
   apply(term, depth) {
@@ -104,7 +97,7 @@ class Context {
       const cta = ct;
       if (t.c === "MVar") {
         const args = t.args.map((t)=>e(t,d));
-        const subst_t = this.subst.get(t.name);
+        const subst_t = this.meta.get(t.name);
         if (!subst_t) {
           return (ct === cta ? t : MVar(t.name,args));
         } else {
