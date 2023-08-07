@@ -30,14 +30,6 @@ class State {
   
   // Term conversion with memoisation of shifted versions of head and global terms to avoid recomputing and have maximum sharing
   _to_term(s=0) {
-    if (this.state) {
-      // Graph compression
-      if (state.state) {
-        this.state = state.state;
-        this.shift = state.shift+shift;
-      }
-      return this.state.to_term(s+this.shift);
-    }
     if (!this.heads[s]) {
       if (!this.heads[0]) {
         this.heads[0] = this.context.apply(this.head);
@@ -55,22 +47,33 @@ class State {
     return this.terms[s];
   }
   
-  // Update state to a special instance refering an other state that should be shifted
-  as_shifted( [state, shift] ) {
-    delete this.head;
-    delete this.stack;
-    delete this.ctxt;
-    delete this.heads;
-    // Graph compression
-    if (state.state) {
-      this.state = state.state;
-      this.shift = state.shift+shift;
-    } else {
-      this.state = state;
-      this.shift = shift;
-    }
+  link_to(state) {
+    ...
   }
 }
+
+class ShiftedState {
+  constructor(state, shift=1) {
+    this.state = state;
+    this.shift = shift;
+    this.compress();
+  }
+  
+  // Graph compression
+  compress() {
+    if (this.state instanceof ShiftedState) {
+      this.state = state.state;
+      this.shift = state.shift+shift;
+    }
+  }
+  
+  // Overriding term conversion
+  to_term(s=0) {
+    this.compress();
+    return (this.state == null) ? null: this.state.to_term(s+this.shift);
+  }
+}
+
 
 // A context is a mapping both of meta-variables and variables of a term
 // to states (which can be computed to term if needed)
@@ -78,7 +81,9 @@ class State {
 class Context {
   constructor(meta=new Map(), depth=0, subst=[]) {
     this.meta = meta;
-    this.depth = depth; // Should be equal to the number of null in subst
+    this.depth = depth;
+    // Depth of the meta substitution
+    // Should be equal to the number of null in subst
     this.subst = subst;
   }
   
@@ -87,42 +92,64 @@ class Context {
   }
   
   function shift_extend() {
-    return new Context( this.meta, this.depth+1, this.subst.map((s) => new State().as_shifted([s,1])).concat(null), );
+    return new Context( this.meta, this.depth+1, this.subst.map((s) => new ShiftedState(s,1)).concat( new ShiftedState(null,0) ), );
   }
   
-  apply(term, depth) {
+  apply(term, depth=0) {
+    const varshift = this.subst.length - this.depth;
     // Compteur de substitutions
     let ct = 0;
     function e(t,d) {
       const cta = ct;
       if (t.c === "MVar") {
-        const args = t.args.map((t)=>e(t,d));
-        const subst_t = this.meta.get(t.name);
-        if (!subst_t) {
-          return (ct === cta ? t : MVar(t.name,args));
+        const args = t.args.map( (t)=>e(t,d) );
+        const msubst_t = this.meta.get(t.name);
+        if (!msubst_t) {
+          return (ct === cta ? t : MVar(t.name, args));
         } else {
-          ct += 1; // Substitution effectuée
-          return meta_map_subst(subst_t.to_term(d+this.depth) , args);
+          ct += 1; // Meta-substitution effectuée
+          const subst_ctxt = new Context(new Map(), 0, args);
+          const subst_mt = subst_ctxt.apply(msubst_t)
+          return shift(subst_mt, d+this.depth);
         }
       } else if (t.c === "Var") {
-        if (t.index != d) {
-          return Var(t.index - (t.index > d ? 1 : 0));
+        const db = t.index - d;
+        if (db < 0) { // Locally bounded variable
+          return t;
+        } else if (db >= this.subst.length) { // Free variable
+          if (varshift == 0) {
+            return t;
+          } else {
+            ct += 1; // Shifting effectué
+            return Var(t.index - varshift);
+          }
         } else {
-          if (!shifts[d]) { shifts[d] = shift(val,inc=d); }
-          return shifts[d];
+          const st = this.subst[db];
+          const te = st.to_term(d);
+          if (te == null) {
+            if (db == st.shift) {
+              return t; //
+            } else {
+              ct += 1; // Shifting effectué sur une variable localement liées mais sous un lambda substitué
+              return Var(t.index - db + st.shift);
+            }
+          } else {
+            ct += 1; // Substitution effectuée
+            return te;
+          }
         }
       } else if (t.c === "All") {
         const dom = e(t.dom, d  );
         const cod = e(t.cod, d+1);
-        return (ct === cta && t) || All(t.name, dom, cod);
+        return (ct === cta) ? t : All(t.name, dom, cod);
       } else if (t.c === "Lam") {
         const type = t.type && e(t.type, d  );
         const body =           e(t.body, d+1);
-        return (ct === cta && t) || Lam(t.name,type,body);
+        return (ct === cta) ? t : Lam(t.name,type,body);
       } else if (t.c === "App") {
         const func = e(t.func,d);
         const argm = e(t.argm,d);
-        return (ct === cta && t) || App(func,argm);
+        return (ct === cta) ? t : App(func,argm);
       } else {
         return t;
       }
@@ -234,7 +261,7 @@ class ReductionEngine {
     */
   whnf_state(state) {
     while (true) {
-      if (state.state) {
+      if (state instanceof ShiftedState) {
         whnf_state(state.state);
         return state;
       }
@@ -258,13 +285,22 @@ class ReductionEngine {
           if (!rule_name) { return state; }
           break;
         case "MVar":
-          if (state.ctxt.meta.get( state.head.name ) ) {
-            ...
+          const msubst_t = state.ctxt.meta.get( state.head.name );
+          if ( msubst_t ) {
+            const args = state.args.map( (t)=>new State(t,state.ctxt) );
+            const ctxt = new Context(new Map(), 0, args);
+            let nstate = new State(msubst_t, ctxt);
+            if (state.ctxt.depth > 0) {
+              nstate = new ShiftedState(nstate, state.ctxt.depth);
+            }
+            return whnf_state( nstate );
+          } else {
+            return state;
           }
           break;
         case "Var":
           if (state.ctxt.subst[state.head.index]) {
-            state.as_shifted( state.ctxt.subst[state.head.index]; );
+            return whnf_state( state.ctxt.subst[state.head.index] );
           }
           break;
         default: return state; // Any other construction
