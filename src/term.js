@@ -126,7 +126,7 @@ function same_head(a,b,acc) {
       acc.push([a.body,b.body]);
       break;
     case "App":
-      acc.push([a.func,b.func], [a.argm,b.argm]);
+      acc.push([a.argm,b.argm], [a.func,b.func]);
       break;
     case "MVar":
       if (a.name !== b.name || a.args.length !== b.args.length) { return false; }

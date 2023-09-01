@@ -21,7 +21,7 @@ function filter_rules(rules,arity) {
  */
 class State {
   constructor(term, ctxt = new Context()) {
-    this.head = term;
+    this._head = term;
     // The stack may be modified in place
     this.stack = [];
     // The context may be shared among states and should not be modified in place
@@ -29,6 +29,15 @@ class State {
     // Array of shifted term representations of the state. Should be reset every time the state is updated
     this.terms = [ term ];
     this.heads = [];
+  }
+  
+  set head(h) {
+    this.terms = [];
+    this._head = h;
+  }
+  
+  get head() {
+    return this._head;
   }
   
   pp() {
@@ -64,7 +73,7 @@ class State {
   _to_term(s=0) {
     if (!this.heads[s]) {
       if (!this.heads[0]) {
-        this.heads[0] = this.context.apply(this.head);
+        this.heads[0] = this.ctxt.apply(this.head);
       }
       this.heads[s] = shift(this.heads[0], s);
     }
@@ -212,7 +221,7 @@ class Context {
   
   substVar(db) {
     const st = this.subst[db];
-    console.log(this.pp(),st);
+    console.log(this.pp(),db, st);
     if (st === undefined) {
       // This should not happen ! Most likely a HO meta-var was wrongly substituted
       throw new Error("[ContextSubst] This should not happen !");
@@ -415,9 +424,11 @@ class ReductionEngine {
           state.ctxt = state.ctxt.extend( state.stack.pop() );
           break;
         case "Ref": // Potential redex
+          console.log("Trying Rewriting:",state.pp()," (",pp_term(state.to_term()),")");
           const rule_name = this.head_rewrite(state);
           // If rewriting occured, proceed with current state, otherwise return
           if (!rule_name) { return state; }
+          console.log("Rewriting:",rule_name);
           break;
         case "MVar":
           const msubst_t = state.ctxt.meta.get( state.head.name );
@@ -431,7 +442,11 @@ class ReductionEngine {
           }
           break;
         case "Var":
-          state.link_to( state.ctxt.substVar(state.head.index) );
+          if (state.head.index >= state.ctxt.subst.length) {
+            return state;
+          }
+          const nst = state.ctxt.substVar(state.head.index);
+          state.link_to(nst);
           break;
         default: return state; // Any other construction
       }
@@ -521,10 +536,21 @@ class ReductionEngine {
   
   // Checks if two terms are convertible
   are_convertible(u, v) {
+    console.log("Conv:",pp_term(u),"<-?->",pp_term(v));
     const acc = [ [u,v] ];
     while (acc.length > 0) {
       const [a,b] = acc.pop();
-      if (!equals(a,b) && !same_head( this.whnf(a) , this.whnf(b) , acc )) { return false; }
+      console.log("Equal:",pp_term(a),"=?=",pp_term(b));
+      if (!equals(a,b)) {
+        const whnf_a = this.whnf(a);
+        const whnf_b = this.whnf(b);
+        console.log("Reduced:",pp_term(a),"->>",pp_term(whnf_a));
+        console.log("Reduced:",pp_term(b),"->>",pp_term(whnf_b));
+        if (!same_head(whnf_a, whnf_b, acc)) {
+          console.log("Mismatch: ",pp_term(whnf_a)," <-/-> ", pp_term(whnf_b));
+          return false;
+        }
+      } 
     }
     return true;
   }
