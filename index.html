@@ -69,7 +69,7 @@
 </div>
 
 <script src="lib/bootstrap.bundle.min.js"
-  integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+  integrity="sha384-ld2L/kcTVZx61WGwQz7vrkwU7uStBvzRExaQwwPPqM6yLGYgrGuUcKX/O87p9qy9"
   crossorigin="anonymous"
   onerror="this.onerror=null;this.integrity=null;this.src='lib/bootstrap.bundle.min.js';"
   ></script>
@@ -196,6 +196,7 @@ function check_editor() {
     } catch(e) {
       log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");
       set_button_mode('error');
+      throw(e);
     }
   }, 10);
 }

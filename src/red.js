@@ -11,10 +11,13 @@ function filter_rules(rules,arity) {
   return [ res , max ];
 }
 
-/** A term representation with:
-    - with easy access to its head
-    - reducable in place
-    - includes a meta-substition and a variable substitution
+/** A term representation for faster computation:
+    - provides easy access to its "head"
+    - can be reduced in place
+    - built-in memoization of back (shifted) translations to actual (reduced) terms
+    [head] is a term and should not be modified in place, only inspected
+    [ctxt] is possibly shared among states and must not be modified in place
+    [stack] may be modified in place
  */
 class State {
   constructor(term, ctxt = new Context()) {
@@ -24,8 +27,37 @@ class State {
     // The context may be shared among states and should not be modified in place
     this.ctxt = ctxt;
     // Array of shifted term representations of the state. Should be reset every time the state is updated
-    this.terms = [];
+    this.terms = [ term ];
     this.heads = [];
+  }
+  
+  pp() {
+    return pp_term(this.head) + (this.stack.length ? " with " + this.stack.length + " args" : "") + this.ctxt.pp();
+  }
+  
+  getHeadC() {
+    return this.head.c;
+  }
+  
+  
+  getHeadName() {
+    return this.head.name;
+  }
+  
+  getHeadIndex() {
+    return this.head.index;
+  }
+  
+  getHeadBody() {
+    return new State(this.head.body, this.ctxt.shift_extend());
+  }
+  
+  nbArgs() {
+    return this.stack.length;
+  }
+  
+  forEachArg(f) {
+    this.stack.forEach(f);
   }
   
   // Term conversion with memoisation of shifted versions of head and global terms to avoid recomputing and have maximum sharing
@@ -47,8 +79,17 @@ class State {
     return this.terms[s];
   }
   
-  link_to(state) {
-    ...
+  // Switch this state to a (shifted) pointer state
+  link_to(state, shift=0) {
+    delete this.head;
+    delete this.stack;
+    delete this.ctxt;
+    delete this.terms;
+    delete this.heads;
+    this.state = state;
+    this.shift = shift;
+    this.__proto__ = ShiftedState.prototype;
+    this.compress();
   }
 }
 
@@ -59,24 +100,100 @@ class ShiftedState {
     this.compress();
   }
   
+  pp() {
+    if (this.state === undefined) {
+      return "[X]";
+    } else {
+      return "[+"+this.shift+"] "+this.state.pp();
+    }
+  }
+  
   // Graph compression
   compress() {
     if (this.state instanceof ShiftedState) {
-      this.state = state.state;
-      this.shift = state.shift+shift;
+      // TODO : check if this is ever executed
+      this.shift = this.state.shift + this.shift;
+      this.state = this.state.state;
     }
   }
   
   // Overriding term conversion
   to_term(s=0) {
-    this.compress();
-    return (this.state == null) ? null: this.state.to_term(s+this.shift);
+    return this.state.to_term(s+this.shift);
+  }
+  
+  getHeadC() {
+    return this.state.getHeadC();
+  }
+  
+  
+  getHeadName() {
+    return this.state.getHeadName();
+  }
+  
+  getHeadIndex() {
+    return this.state.getHeadIndex()+this.shift;
+  }
+  
+  getHeadBody() {
+    return new ShiftedState(this.state.getHeadBody(), this.shift);
+  }
+  
+  nbArgs() {
+    return this.state.nbArgs();
+  }
+  
+  forEachArg(f) {
+    this.state.forEachArg( (a)=> f(new ShiftedState(a, this.shift)));
+  }
+}
+
+function check_meta_match(term, map) {
+  const depth = map.length;
+  if (depth == 0) { return true; }
+  function chk(t,d) {
+    switch (t.c) {
+      case "Var" :
+        if (t.index >= d && t.index < d + depth && map[t.index - d] === undefined) { 
+          fail('MetaMatchFailed',"Unexpected locally bounded variable ["+pp_term(t)+"]." );
+        }
+      case "All" :
+        chk(t.dom,d);
+        chk(t.cod,d+1);
+      case "Lam" :
+        if (t.type) {
+          chk(t.type,d)
+        }
+        chk(t.body,d+1);
+      case "App" :
+        chk(t.func,d);
+        chk(t.argm,d);
+      case "MVar":
+        t.args.forEach( (t)=>chk(t,d) );
+      default: return t;
+    }
+  }
+  return chk(term,0);
+}
+
+class MetaState {
+  constructor(term, map) {
+    check_meta_match(term, map);
+    this.term = term;
+    this.map = map;
+  }
+  
+  meta_apply(args) {
+    const subst = this.map.map( (i) => (i === undefined ? undefined : args[i]) );
+    const ctxt = new Context(new Map(), 0, subst);
+    return new State(this.term, ctxt);
   }
 }
 
 
-// A context is a mapping both of meta-variables and variables of a term
-// to states (which can be computed to term if needed)
+// A context is a mapping of some meta-variables and variables in a term
+// to states (which can be computed to term if needed).
+// Meta-variables are mapped to states whose [arity] first variables are meant to be replaced
 // It can be applied to terms.
 class Context {
   constructor(meta=new Map(), depth=0, subst=[]) {
@@ -85,13 +202,29 @@ class Context {
     // Depth of the meta substitution
     // Should be equal to the number of null in subst
     this.subst = subst;
+    // Array of states substituable to meta-variables
   }
   
-  function extend(s) {
-    return new Context( this.meta, this.depth  , this.subst.concat(s) );
+  pp() {
+    return (this.meta.size    == 0 ? "" : " [Meta: " + this.meta.size + " under " + this.depth+"]") + 
+      (this.subst.length == 0 ? "" : " [Vars: "  +  this.subst.map( (e,i) => i+"->"+e.pp()).join(' , ') + "]");
   }
   
-  function shift_extend() {
+  substVar(db) {
+    const st = this.subst[db];
+    console.log(this.pp(),st);
+    if (st === undefined) {
+      // This should not happen ! Most likely a HO meta-var was wrongly substituted
+      throw new Error("[ContextSubst] This should not happen !");
+    }
+    return st;
+  }
+  
+  extend(s) {
+    return new Context( this.meta, this.depth  , [s].concat( this.subst ) );
+  }
+  
+  shift_extend() {
     return new Context( this.meta, this.depth+1, this.subst.map((s) => new ShiftedState(s,1)).concat( new ShiftedState(null,0) ), );
   }
   
@@ -103,14 +236,13 @@ class Context {
       const cta = ct;
       if (t.c === "MVar") {
         const args = t.args.map( (t)=>e(t,d) );
-        const msubst_t = this.meta.get(t.name);
-        if (!msubst_t) {
+        const meta_state = this.meta.get(t.name);
+        if (!meta_state) {
           return (ct === cta ? t : MVar(t.name, args));
         } else {
           ct += 1; // Meta-substitution effectuée
-          const subst_ctxt = new Context(new Map(), 0, args);
-          const subst_mt = subst_ctxt.apply(msubst_t)
-          return shift(subst_mt, d+this.depth);
+          const meta_subst_state = meta_state.meta_apply(args);
+          return d+this.depth > 0 ? new ShiftedState(meta_subst_state, d+this.depth) : meta_subst_state;
         }
       } else if (t.c === "Var") {
         const db = t.index - d;
@@ -124,7 +256,7 @@ class Context {
             return Var(t.index - varshift);
           }
         } else {
-          const st = this.subst[db];
+          const st = this.substVar(db);
           const te = st.to_term(d);
           if (te == null) {
             if (db == st.shift) {
@@ -261,23 +393,26 @@ class ReductionEngine {
     */
   whnf_state(state) {
     while (true) {
+      console.log("WHNF:", state.pp());
       if (state instanceof ShiftedState) {
-        whnf_state(state.state);
+        this.whnf_state(state.state);
+        state.compress();
         return state;
       }
+      while (state.head.c == "App") {
+        // Push the state version of the argument on the stack
+        state.stack.push( new State(state.head.argm, state.ctxt) );
+        state.head = state.head.func;
+      }
+      // Replace switch with if (local variables are declared)
       switch (state.head.c) {
-        case "App":
-          // Push the state version of the argument on the stack
-          state.stack.push( new State(state.head.argm, state.ctxt) );
-          state.head = state.head.func;
-          break;
         case "Lam":
           // Unapplied lambda is a WHNF
           if (state.stack.length === 0) { return state; }
           // Otherwise add the top stack argument to the substitution
           // and compute the WHNF of the body (\x.t) u1 u2 ... --> t[x\u1] u2 ...
           state.head = state.head.body;
-          state.ctxt = state.ctxt.extend( state.stack.pop()];
+          state.ctxt = state.ctxt.extend( state.stack.pop() );
           break;
         case "Ref": // Potential redex
           const rule_name = this.head_rewrite(state);
@@ -289,19 +424,14 @@ class ReductionEngine {
           if ( msubst_t ) {
             const args = state.args.map( (t)=>new State(t,state.ctxt) );
             const ctxt = new Context(new Map(), 0, args);
-            let nstate = new State(msubst_t, ctxt);
-            if (state.ctxt.depth > 0) {
-              nstate = new ShiftedState(nstate, state.ctxt.depth);
-            }
-            return whnf_state( nstate );
+            const nstate = new State(msubst_t, ctxt);
+            return whnf_state( new ShiftedState(nstate, state.ctxt.depth) );
           } else {
             return state;
           }
           break;
         case "Var":
-          if (state.ctxt.subst[state.head.index]) {
-            return whnf_state( state.ctxt.subst[state.head.index] );
-          }
+          state.link_to( state.ctxt.substVar(state.head.index) );
           break;
         default: return state; // Any other construction
       }
@@ -310,19 +440,19 @@ class ReductionEngine {
 
   // Applies a (single) rewrite step at the head if any rule matches at the head
   // Updates [state] in place and returns the name of the rule used or null if no step was performed
+  // asserts: state instanceof State
   head_rewrite(state) {
     // Getting the head symbol's decision tree
-    let [head,stack] = state;
-    const dtree = this.get_decision_tree(head.name, stack.length);
+    const dtree = this.get_decision_tree(state.head.name, state.stack.length);
     if (!dtree) { return null; }
     // Truncate to keep only the first [arity] arguments from the top of the stack
-    const truncated_stack = stack.slice(stack.length-dtree.arity);
+    const truncated_stack = state.stack.slice(state.stack.length-dtree.arity);
     // Running the decision tree with the given args (in order)
     let [rule, meta_subst] = this.exec_dtree(dtree.tree,truncated_stack);
     if (!rule) { return null; }
     state.head = rule.rhs;
-    state.stack = stack.slice(0,stack.length-rule.stack.length);
-    state.ctxt = new Context([], meta_subst);
+    state.stack = state.stack.slice(0,state.stack.length-rule.stack.length);
+    state.ctxt = new Context(meta_subst);
     return rule.name;
   }
   
@@ -330,44 +460,43 @@ class ReductionEngine {
   exec_dtree(dtree, stack) {
     if (!dtree) { return [null,null]; }
     if (dtree.c === 'Switch') {
-      const [head,hstack,subst,msubst] = this.whnf_state(stack[dtree.index]);
-      switch (head.c) {
+      const whnf = this.whnf_state(stack[dtree.index]);
+      // whnf should be a fully unfolded (head is not an App) and compressed (not a shift of a shift) state
+      switch (whnf.getHeadC()) {
         case 'Lam':
           if (!dtree.Lam) { return this.exec_dtree(dtree.def,stack); }
-          stack.push( [head.body,[],subst,msubst] );
+          stack.push( whnf.getHeadBody() );
           return this.exec_dtree(dtree.Lam,stack);
         case 'Ref':
           if (!dtree.Ref                          ) { return this.exec_dtree(dtree.def,stack); }
-          if (!dtree.Ref[head.name]               ) { return this.exec_dtree(dtree.def,stack); }
-          if (!dtree.Ref[head.name][hstack.length]) { return this.exec_dtree(dtree.def,stack); }
-          hstack.forEach((e)=>stack.push(e));
-          
-          // TODO: 
-          return this.exec_dtree(dtree.Ref[head.name][hstack.length],stack);
+          if (!dtree.Ref[whnf.getHeadName()]               ) { return this.exec_dtree(dtree.def,stack); }
+          if (!dtree.Ref[whnf.getHeadName()][whnf.nbArgs()]) { return this.exec_dtree(dtree.def,stack); }
+          whnf.forEachArg((e)=>stack.push(e));
+          return this.exec_dtree(dtree.Ref[whnf.getHeadName()][whnf.nbArgs()],stack);
         case 'Var':
           if (!dtree.Var                           ) { return this.exec_dtree(dtree.def,stack); }
-          if (!dtree.Var[head.index]               ) { return this.exec_dtree(dtree.def,stack); }
-          if (!dtree.Var[head.index][hstack.length]) { return this.exec_dtree(dtree.def,stack); }
-          hstack.forEach((e)=>stack.push(e));
-          return this.exec_dtree(dtree.Var[head.index][hstack.length], stack);
+          if (!dtree.Var[whnf.getHeadIndex()]               ) { return this.exec_dtree(dtree.def,stack); }
+          if (!dtree.Var[whnf.getHeadIndex()][whnf.nbArgs()]) { return this.exec_dtree(dtree.def,stack); }
+          whnf.forEachArg((e)=>stack.push(e));
+          return this.exec_dtree(dtree.Var[whnf.getHeadIndex()][whnf.nbArgs()], stack);
         case 'MVar':
           return this.exec_dtree(dtree.def,stack);
-        default: fail("DTreeExec","Unexpected constructor in switch case: "+head.c);
+        default: fail("DTreeExec","Unexpected constructor in switch case: "+whnf.getHeadC());
       }
     } else if (dtree.c === 'Test') {
       const subst = new Map();
       for (let i = 0; i < dtree.match.length; i++) {
         let m = dtree.match[i];
         let matched = stack[m.index];
-        if (!m.joker_match) { // TODO : implement joker match
-          // In case of "joker match" (meta var fully applied to locally bounded *in the DB index order*) :
+        if (!m.joker_match) {
+          // In case of "joker match" (meta var applied to all locally bounded *in the DB index order*) :
           // the state is already the matched version
           try {
-            matched = meta_match(matched.to_term(), m.args);
+            matched = new MetaState(matched.to_term(), m.args);
           } catch(e) {
             if (e.title == 'MetaMatchFailed') {
               try {
-                matched = meta_match( this.nf_state(matched).to_term(), m.args);
+                matched = new MetaState( this.nf_state(matched).to_term(), m.args);
               } catch(e) {
                 if (e.title == 'MetaMatchFailed') {
                   return this.exec_dtree(dtree.def, stack);
@@ -377,7 +506,7 @@ class ReductionEngine {
           }
         }
         if (subst.get(m.name)) {
-          if (!this.are_convertible(subst.get(m.name), matched)) {
+          if (!this.are_convertible(subst.get(m.name).to_term(), matched.to_term())) {
             return this.exec_dtree(dtree.def,stack);
           }
         } else {
@@ -390,7 +519,7 @@ class ReductionEngine {
     }
   }
   
-  // Checks if two terms are equal
+  // Checks if two terms are convertible
   are_convertible(u, v) {
     const acc = [ [u,v] ];
     while (acc.length > 0) {
