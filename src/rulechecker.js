@@ -68,7 +68,9 @@ function meta_map_subst(term, subst, depth=0, to_term=(t)=>t) {
       if ( !(shifts instanceof Array) ) {
         return meta_map_subst(shifts, args);
       } else if (!shifts[d]) {
-        if (!shifts.length) { shifts[0] = to_term(subst[t.name]); }
+        if (shifts.length == 0) {
+          shifts[0] = to_term(subst.get(t.name));
+        }
         shifts[d] = shift(shifts[0], inc=d);
       }
       return meta_map_subst(shifts[d], args);

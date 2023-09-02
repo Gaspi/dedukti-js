@@ -93,5 +93,3 @@ lambda: a:type -> b:type -> (term a -> term b) -> term (arrow a b);
 // 
 // Have fun with Dedukti !
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#EVAL x:Nat |- (n:Nat => plus n two) x;

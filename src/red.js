@@ -20,24 +20,29 @@ function filter_rules(rules,arity) {
     [stack] may be modified in place
  */
 class State {
-  constructor(term, ctxt = new Context()) {
-    this._head = term;
-    // The stack may be modified in place
+  constructor(term, ctxt=new Context()) {
+    this.head = term;
+    // The stack is meant to be modified in place
     this.stack = [];
-    // The context may be shared among states and should not be modified in place
     this.ctxt = ctxt;
+    // The head and context are likey shared among states and must not be modified in place
     // Array of shifted term representations of the state. Should be reset every time the state is updated
-    this.terms = [ term ];
-    this.heads = [];
+    this._terms = [];
+    this._heads = [];
+    if (ctxt.isEmpty()) {
+      // If the state is created without context, it is cast back to the same term
+      this._terms = [ term ];
+    }
+    this._head = this.head;
+    this._ctxt = this.ctxt;
   }
   
-  set head(h) {
-    this.terms = [];
-    this._head = h;
-  }
-  
-  get head() {
-    return this._head;
+  check_memoization() {
+    if (this._head === this.head && this._ctxt === this.ctxt) { return; }
+    this._terms = [];
+    this._heads = [];
+    this._head = this.head;
+    this._ctxt = this.ctxt;
   }
   
   pp() {
@@ -71,21 +76,24 @@ class State {
   
   // Term conversion with memoisation of shifted versions of head and global terms to avoid recomputing and have maximum sharing
   _to_term(s=0) {
-    if (!this.heads[s]) {
-      if (!this.heads[0]) {
-        this.heads[0] = this.ctxt.apply(this.head);
+    // Memoisation of head shifted versions
+    if (!this._heads[s]) {
+      if (!this._heads[0]) {
+        this._heads[0] = this.ctxt.apply(this.head);
       }
-      this.heads[s] = shift(this.heads[0], s);
+      this._heads[s] = shift(this._heads[0], s);
     }
-    return this.stack.map( (e)=>e.to_term(s) ).reduceRight(App, this.heads[s] );
+    return this.stack.map( (e)=>e.to_term(s) ).reduceRight(App, this._heads[s] );
   }
   
   // Memoised version
+  // TODO: detect closed terms (unchanged by shifting) and avoid computing their shifted versions at all
   to_term(s=0) {
-    if (!this.terms[s]) {
-      this.terms[s] = this._to_term(s);
+    this.check_memoization();
+    if (!this._terms[s]) {
+      this._terms[s] = this._to_term(s);
     }
-    return this.terms[s];
+    return this._terms[s];
   }
   
   // Switch this state to a (shifted) pointer state
@@ -182,12 +190,13 @@ function check_meta_match(term, map) {
       default: return t;
     }
   }
-  return chk(term,0);
+  return chk(term,depth);
 }
 
 class MetaState {
   constructor(term, map) {
     check_meta_match(term, map);
+    console.log("MetaState", term, map);
     this.term = term;
     this.map = map;
   }
@@ -214,6 +223,10 @@ class Context {
     // Array of states substituable to meta-variables
   }
   
+  isEmpty() {
+    return this.meta.size == 0 && this.depth == 0 && this.subst.length == 0;
+  }
+  
   pp() {
     return (this.meta.size    == 0 ? "" : " [Meta: " + this.meta.size + " under " + this.depth+"]") + 
       (this.subst.length == 0 ? "" : " [Vars: "  +  this.subst.map( (e,i) => i+"->"+e.pp()).join(' , ') + "]");
@@ -221,7 +234,6 @@ class Context {
   
   substVar(db) {
     const st = this.subst[db];
-    console.log(this.pp(),db, st);
     if (st === undefined) {
       // This should not happen ! Most likely a HO meta-var was wrongly substituted
       throw new Error("[ContextSubst] This should not happen !");
@@ -238,26 +250,26 @@ class Context {
   }
   
   apply(term, depth=0) {
+    const self = this;
     const varshift = this.subst.length - this.depth;
     // Compteur de substitutions
     let ct = 0;
     function e(t,d) {
       const cta = ct;
-      if (t.c === "MVar") {
+      if (t.c == "MVar") {
         const args = t.args.map( (t)=>e(t,d) );
-        const meta_state = this.meta.get(t.name);
+        const meta_state = self.meta.get(t.name);
         if (!meta_state) {
           return (ct === cta ? t : MVar(t.name, args));
         } else {
           ct += 1; // Meta-substitution effectuée
-          const meta_subst_state = meta_state.meta_apply(args);
-          return d+this.depth > 0 ? new ShiftedState(meta_subst_state, d+this.depth) : meta_subst_state;
+          return meta_state.meta_apply(args).to_term(d+self.depth);
         }
       } else if (t.c === "Var") {
         const db = t.index - d;
         if (db < 0) { // Locally bounded variable
           return t;
-        } else if (db >= this.subst.length) { // Free variable
+        } else if (db >= self.subst.length) { // Free variable
           if (varshift == 0) {
             return t;
           } else {
@@ -265,7 +277,7 @@ class Context {
             return Var(t.index - varshift);
           }
         } else {
-          const st = this.substVar(db);
+          const st = self.substVar(db);
           const te = st.to_term(d);
           if (te == null) {
             if (db == st.shift) {
@@ -402,7 +414,7 @@ class ReductionEngine {
     */
   whnf_state(state) {
     while (true) {
-      console.log("WHNF:", state.pp());
+      //console.log("WHNF:", state.pp());
       if (state instanceof ShiftedState) {
         this.whnf_state(state.state);
         state.compress();
@@ -424,22 +436,16 @@ class ReductionEngine {
           state.ctxt = state.ctxt.extend( state.stack.pop() );
           break;
         case "Ref": // Potential redex
-          console.log("Trying Rewriting:",state.pp()," (",pp_term(state.to_term()),")");
           const rule_name = this.head_rewrite(state);
           // If rewriting occured, proceed with current state, otherwise return
           if (!rule_name) { return state; }
-          console.log("Rewriting:",rule_name);
           break;
         case "MVar":
-          const msubst_t = state.ctxt.meta.get( state.head.name );
-          if ( msubst_t ) {
-            const args = state.args.map( (t)=>new State(t,state.ctxt) );
-            const ctxt = new Context(new Map(), 0, args);
-            const nstate = new State(msubst_t, ctxt);
-            return whnf_state( new ShiftedState(nstate, state.ctxt.depth) );
-          } else {
-            return state;
-          }
+          const meta_state = state.ctxt.meta.get( state.head.name );
+          if (!meta_state) { return state; }
+          const args = state.head.args.map( (t)=>new State(t, state.ctxt) );
+          const meta_subst_state = meta_state.meta_apply(args);
+          state.link_to(meta_subst_state);
           break;
         case "Var":
           if (state.head.index >= state.ctxt.subst.length) {
@@ -500,18 +506,22 @@ class ReductionEngine {
       }
     } else if (dtree.c === 'Test') {
       const subst = new Map();
+      console.log("Test: " + dtree.rule.name);
       for (let i = 0; i < dtree.match.length; i++) {
         let m = dtree.match[i];
+        console.log(m);
         let matched = stack[m.index];
         if (!m.joker_match) {
           // In case of "joker match" (meta var applied to all locally bounded *in the DB index order*) :
           // the state is already the matched version
           try {
-            matched = new MetaState(matched.to_term(), m.args);
+            console.log("Matching...", matched.to_term(), m.subst);
+            matched = new MetaState(matched.to_term(), m.subst);
+            console.log("Matched ", matched);
           } catch(e) {
             if (e.title == 'MetaMatchFailed') {
               try {
-                matched = new MetaState( this.nf_state(matched).to_term(), m.args);
+                matched = new MetaState( this.nf_state(matched).to_term(), m.subst);
               } catch(e) {
                 if (e.title == 'MetaMatchFailed') {
                   return this.exec_dtree(dtree.def, stack);
@@ -520,8 +530,17 @@ class ReductionEngine {
             }
           }
         }
-        if (subst.get(m.name)) {
-          if (!this.are_convertible(subst.get(m.name).to_term(), matched.to_term())) {
+        // Check if the same meta variable was previously matched
+        const prev_matched = subst.get(m.name);
+        if (prev_matched) {
+          // Assuming the matched problem is { t against X[2,1] under 4 lambdas }
+          // Then matched.map = [undefined, 1, 0, undefined]  and  matched.term = t
+          // Assuming previously matched is { u against X[1,0] under 3 lambdas }
+          // Then prev_matched.map = [1, 0, undefined]  and  prev_matched.term = u
+          // We need to check that   t <<->> u{ 1 <- 2, 0 <- 1}
+          // or, equivalently, that  u <<->> t{ 2 <- 1, 1 <- 0}
+          const matched_args = m.args.map( (i) => Var(i) );
+          if (!this.are_convertible(prev_matched.meta_apply(matched_args).to_term(), matched.term)) {
             return this.exec_dtree(dtree.def,stack);
           }
         } else {
@@ -536,18 +555,16 @@ class ReductionEngine {
   
   // Checks if two terms are convertible
   are_convertible(u, v) {
-    console.log("Conv:",pp_term(u),"<-?->",pp_term(v));
+    //console.log("Conv:",pp_term(u),"<-?->",pp_term(v));
     const acc = [ [u,v] ];
     while (acc.length > 0) {
       const [a,b] = acc.pop();
-      console.log("Equal:",pp_term(a),"=?=",pp_term(b));
+      //console.log("Equal:",pp_term(a),"=?=",pp_term(b));
       if (!equals(a,b)) {
         const whnf_a = this.whnf(a);
         const whnf_b = this.whnf(b);
-        console.log("Reduced:",pp_term(a),"->>",pp_term(whnf_a));
-        console.log("Reduced:",pp_term(b),"->>",pp_term(whnf_b));
         if (!same_head(whnf_a, whnf_b, acc)) {
-          console.log("Mismatch: ",pp_term(whnf_a)," <-/-> ", pp_term(whnf_b));
+          //console.log("Mismatch: ",pp_term(whnf_a)," <-/-> ", pp_term(whnf_b));
           return false;
         }
       } 

@@ -115,7 +115,13 @@ function compute_matching_problem(row,depths,def=null) {
   for (let i = 0; i < row.cols.length; i++) {
     const p = row.cols[i];
     if (p.c == 'MVar' && !p.joker) {
-      mvars.push({ index:i, name:p.name, args:get_meta_match(p.args, depths[i]), depth:depths[i] });
+      mvars.push({
+        index:i,
+        name:p.name,
+        subst:get_meta_match(p.args, depths[i]),
+        depth:depths[i],
+        args: p.args
+        });
     }
   }
   return { c:'Test', match:mvars, rule:row.rule, def:def };
