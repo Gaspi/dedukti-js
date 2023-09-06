@@ -217,6 +217,23 @@ class MetaState {
   }
 }
 
+class JokerState {
+  constructor(state, depth) {
+    this.state = state;
+    //this.depth = depth;
+  }
+  
+  meta_apply(args) {
+    if (args.all( (e,i) => e.c === 'Var' && e.index === i )) {
+      return this.state;
+    }
+    // TODO : create new context based on the provided arguments substituted in
+    // [ Shifted(s3,4), Shifted(null, 3), s2, Shifted(null, 2), Shifted(null, 1), s1 ]  <- [a,b,c]
+    // [ Shifted(s3,1), c, s2, b, a, s1 ]  <- [a,b,c]
+    return new State(this.term, ctxt);
+  }
+}
+
 
 // A context is a mapping of some meta-variables and variables in a term
 // to states (which can be computed to term if needed).
@@ -453,16 +470,8 @@ class ReductionEngine {
           state.ctxt = state.ctxt.extend( state.stack.pop() );
           break;
         case "Ref": // Potential redex
-          console.log( " ".repeat(logdepth)+"RW "+state.head.name);
-          logdepth += 1;
           const rule_name = this.head_rewrite(state);
           // If rewriting occured, proceed with current state, otherwise return
-          logdepth -= 1;
-          if (!rule_name) {
-            console.log( " ".repeat(logdepth)+"> NORew");
-          } else {
-            console.log( " ".repeat(logdepth)+"> Rule "+rule_name);
-          }
           if (!rule_name) { return state; }
           break;
         case "MVar":
@@ -510,7 +519,15 @@ class ReductionEngine {
     // Truncate to keep only the first [arity] arguments from the top of the stack
     const truncated_stack = state.stack.slice(state.stack.length-dtree.arity);
     // Running the decision tree with the given args (in order)
+    console.log( " ".repeat(logdepth)+"RW "+state.head.name, state.pp());
+    logdepth += 1;
     let [rule, meta_subst] = this.exec_dtree(dtree.tree,truncated_stack);
+    logdepth -= 1;
+    if (!rule) {
+      console.log( " ".repeat(logdepth)+"> NORew");
+    } else {
+      console.log( " ".repeat(logdepth)+"> Rule "+rule.name);
+    }
     if (!rule) { return null; }
     state.head = rule.rhs;
     state.stack = state.stack.slice(0,state.stack.length-rule.stack.length);
@@ -551,9 +568,11 @@ class ReductionEngine {
       for (let i = 0; i < dtree.match.length; i++) {
         const m = dtree.match[i];
         let matched = stack[m.index];
-        if (!m.joker_match) {
-          // In case of "joker match" (meta var applied to all locally bounded *in the DB index order*) :
-          // the state is already the matched version
+        if (m.joker_match) {
+          // "joker match" : the meta var is applied to all locally bounded variables in their DB index order
+          // we reuse the state
+          matched = new JokerState(matched, m.depth);
+        } else {
           try {
             matched = new MetaState(matched.to_term(), m.subst);
           } catch(e) {

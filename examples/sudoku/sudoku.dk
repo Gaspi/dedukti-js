@@ -177,18 +177,18 @@ fail : solution;
 
 
 ite : bool -> solution -> solution -> solution;
-: ite T x * --> x;
-: ite F * x --> x;
+ite_T : ite T x * --> x;
+ite_F : ite F * x --> x;
 
 iffail : solution -> solution -> solution;
-: iffail (success x) * --> success x;
-: iffail fail     d --> d;
+iffail_s : iffail (success x) * --> success x;
+iffail_f : iffail fail        d --> d;
 
 solve : ind -> ind -> ind -> sudo -> solution;
-: solve i X * s --> solve (S i) 1 1 s;
-: solve X * * s --> success s;
-: solve i j X s --> fail;
-: solve i j k s -->
+solve_i : solve i X * s --> solve (S i) 1 1 s;
+solve_s : solve X * * s --> success s;
+solve_f : solve i j X s --> fail;
+solve_n : solve i j k s -->
   ite
     (eq (get i j s) X)
     (ite
