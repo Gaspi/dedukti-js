@@ -1,97 +1,34 @@
-// Dedukti is a logical framework based on the λΠ-calculus modulo
-// in which many theories and logics can be expressed.
-// Have a look at :
-//   https://deducteam.github.io/
-//   https://github.com/Deducteam/Dedukti
-
-// Symbols are introduced together with their declared types using a colon `:`.
-Nat  : Type;  // `Type` is a special "type of types"
-zero : Nat;
-
-// product types are built using `->`
-succ : Nat -> Nat;
-plus : Nat -> Nat -> Nat;
-
-// Rewrite rules allow to define computation
-zero_left_neutral : plus zero n --> n;
-// Since `n` doesn't refer to a defined symbol, it is inferred to be a meta-variable
-// The rule name `zero_left_neutral` is seldom useful and can be omitted
-
-: plus n zero --> n;
-: plus (succ n) m --> succ (plus n m);
-: plus n (succ m) --> succ (plus n m);
-// All rules must be "type preserving"
-// For instance the following rule is not accepted
-//: plus --> zero;
-
-// Symbols can be provided a definition
-one : Nat := succ zero;
-//... which is equivalent to defining them with a rewrite rule
-two : Nat;
-: two --> succ one;
-
-// `*` is a nameless meta-variable
-mult : Nat -> Nat -> Nat;
-: mult zero * --> zero;
-
-// Function can be defined using lambda abstraction
-twice : Nat -> Nat :=
-  x:Nat => plus x x;
-
-// The `#EVAL` command can be used to (fully) evaluate an expression
-#EVAL Nat;
-#EVAL (x:Nat => twice x)(one);
-
-// The `#INFER` command can be used to infer the type of an expression
-#INFER Nat -> Nat;
-#INFER x : Nat => twice;
-
-// The `#CHECK` command can be used to ensure an expression has a particular type
-#CHECK |- zero : Nat;
-#CHECK |- (Nat -> Nat) : Type;
-#CHECK |- (x:Nat => twice x)(one) : Nat;
-
-// The `#CHECK` command supports a local context of variables
-#CHECK x : Nat, y : Nat -> Nat |- y x : Nat;
-
-// The `#CHECK` also allows to check (non-)conversion
-#CHECK x:Nat |- (n:Nat => plus n two) x == succ (succ x);
-#CHECK x:Nat |- (n:Nat => plus n n  ) x != succ (succ x);
 
 
-// Dependent product type allow to define lists parameterized by their size
-Elt: Type;
-Vector: Nat -> Type;
-nil: Vector zero;
-cons: n:Nat -> Elt -> Vector n -> Vector (succ n);
+#REQUIRE sudoku/sudoku;
 
-// Type checking handles higher order types
-append: n:Nat -> Vector n -> m:Nat -> Vector m -> Vector (plus n m);
-: append zero nil n v --> v;
-: append (succ n) (cons n e v1) m v2 --> cons (plus n m) e (append n v1 m v2);
+super_easy_sudoku :=
+  c (l 4 3 5   2 6 9   7 8 1)
+    (l 6 8 2   5 7 1   4 9 3)
+    (l 1 9 7   8 3 4   5 6 2)
 
+    (l 8 2 X   1 X X   X 4 X)
+    (l 3 7 4   6 8 2   9 1 5)
+    (l 9 5 1   7 4 3   X 2 8)
 
-// Symbols can be declared "constant" with the `#CONST` command.
-// This forbids it to be rewritten but helps the type checking
-type: Type;
-#CONST arrow: type -> type -> type;
-#CONST term: type -> Type;
+    (l 5 1 9   3 2 6   8 7 4)
+    (l X 4 X   X 5 7   1 3 6)
+    (l 7 6 3   4 1 8   2 5 9);
 
-// Dedukti supports matching against higher-order patterns
-// Meta-variable may depend on a list of locally bounded variables
-//   A meta-variable instance is written :  Var[x,y,z, ...]
-app: a:type -> b:type -> term (arrow a b) -> term a -> term b;
-lambda: a:type -> b:type -> (term a -> term b) -> term (arrow a b);
-: app a b (lambda a2 b2 (x => f[x])) arg --> f[arg];
+//
+//c (l 4 3 5   2 6 9   7 8 1 )
+//  (l 6 8 2   5 7 1   4 9 3 )
+//  (l 1 9 7   8 3 4   5 6 2 )
+//  
+//  (l 8 2 6   1 9 5   3 4 7 )
+//  (l 3 7 4   6 8 2   9 1 5 )
+//  (l 9 5 1   7 4 3   6 2 8 )
+//  
+//  (l 5 1 9   3 2 6   8 7 4 )
+//  (l 2 4 8   9 5 7   1 3 6 )
+//  (l 7 6 3   4 1 8   2 5 9 )
 
+#EVAL solve_sudo super_easy_sudoku;
 
-// That's it for the basics.
-// 
-// The dropdown menu (top of the left panel) lets you load more examples
-// or your own files (which you can also drag and drop in the text area)
-// but you can also use this editor to start right away.
-// 
-// Have fun with Dedukti !
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#EVAL x:Nat |- (n:Nat => plus n two) x;
+//#EVAL set 1 1 1 super_easy_sudoku;
+// #EVAL exists' ((i' : ind) => eq (get i' 3 super_easy_sudoku ) 1) 1;
