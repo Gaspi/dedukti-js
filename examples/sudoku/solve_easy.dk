@@ -14,4 +14,5 @@ easy_sudoku :=
     (l X 4 X   X 5 X   X 3 6)
     (l 7 X 3   X 1 8   X X X);
 
+// Should solve in less than 1s
 #EVAL solve_sudo easy_sudoku;

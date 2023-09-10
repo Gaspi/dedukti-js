@@ -14,4 +14,5 @@ hard_sudoku :=
     (l X X 8   5 X X   X 1 X)
     (l X 9 X   X X X   4 X X);
 
+// Should solve in 20min
 #EVAL solve_sudo hard_sudoku;

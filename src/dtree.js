@@ -121,7 +121,7 @@ function compute_matching_problem(row,depths,def=null) {
         subst:get_meta_match(p.args, depths[i]),
         depth:depths[i],
         args: p.args,
-        joker_match: p.args.length === depths[i] && p.args.all( (e,i) => e.c === 'Var' && e.index === i)
+        joker_match: p.args.length === depths[i] && p.args.every( (e,i) => e.c === 'Var' && e.index === i)
         });
     }
   }

@@ -100,17 +100,29 @@ class State {
   
   compress() {}
   
-  // Switch this state to a (shifted) pointer state
-  link_to(state, shift=0) {
-    delete this.head;
-    delete this.stack;
-    delete this.ctxt;
-    delete this.terms;
-    delete this.heads;
-    this.state = state;
-    this.shift = shift;
-    this.__proto__ = ShiftedState.prototype;
-    this.compress();
+  // Substitute the head of this state to a an other state
+  link_to(state) {
+    if (!this.stack.length) {
+      delete this.head;
+      delete this.stack;
+      delete this.ctxt;
+      delete this._terms;
+      delete this._heads;
+      delete this._head;
+      delete this._ctxt;
+      this.state = state;
+      this.shift = 0;
+      this.__proto__ = ShiftedState.prototype;
+      this.compress();
+    } else if (state instanceof State) {
+      this.head = state.head;
+      this.ctxt = state.ctxt;
+      this.stack = state.stack.concat(this.stack);
+    } else {
+      this.head = state.to_term();
+      this.ctxt = new Context();
+    }
+    
   }
 }
 
@@ -203,13 +215,14 @@ function check_meta_match(term, map) {
   return chk(term,0);
 }
 
-class MetaState {
+/** General class to represent a match from a LHS
+ */
+class ComplexMatch {
   constructor(term, map) {
     check_meta_match(term, map);
     this.term = term;
     this.map = map;
   }
-  
   meta_apply(args) {
     const subst = this.map.map( (i) => (i === undefined ? undefined : args[i]) );
     const ctxt = new Context(new Map(), 0, subst);
@@ -217,20 +230,44 @@ class MetaState {
   }
 }
 
-class JokerState {
+/** Class for specific match X[x,y,...] where x,y,... are all locally bounded variables in their DB order
+    In that case, no need we record the state
+ */
+class SimpleMatch {
   constructor(state, depth) {
     this.state = state;
+    this.shift = 0;
     //this.depth = depth;
   }
-  
-  meta_apply(args) {
-    if (args.all( (e,i) => e.c === 'Var' && e.index === i )) {
-      return this.state;
+  compress() {
+    if (this.state instanceof ShiftedState) {
+      this.shift = this.state.shift;
+      this.state = this.state.state;
     }
-    // TODO : create new context based on the provided arguments substituted in
-    // [ Shifted(s3,4), Shifted(null, 3), s2, Shifted(null, 2), Shifted(null, 1), s1 ]  <- [a,b,c]
-    // [ Shifted(s3,1), c, s2, b, a, s1 ]  <- [a,b,c]
-    return new State(this.term, ctxt);
+  }
+  meta_apply(args) {
+    if (args.every( (e,i) => e.c === 'Var' && e.index === i )) {
+      return this.state;
+    } else {
+      compress();
+      const subst = new Array(state.ctxt.subst.length);
+      // Create a new context based on the provided arguments substituted in
+      // [ Shifted(s3,4), Shifted(null, 3), s2, Shifted(null, 2), Shifted(null, 1), s1 ]  <- [a,b,c]
+      // [ Shifted(s3,1), c, s2, b, a, s1 ]  <- [a,b,c]
+      let arg_i = 0;
+      for (let i = subst.length-1; i >= 0; i--) {
+        const e = state.ctxt.subst[i];
+        if (e instanceof ShiftedState) {
+          const nshift = e.shift - arg_i;
+          subst[i] = new ShiftedState(e.state || args[args.length-++arg_i], nshift);
+        } else {
+          // asserts arg_i == 0;
+          subst[i] = e;
+        }
+      }
+      // assert arg_i == args.length
+      return new State(this.term, new Context(new Map(), 0, subst) );
+    }
   }
 }
 
@@ -255,7 +292,7 @@ class Context {
   
   pp() {
     return (this.meta.size == 0 ? "" : " [Meta: " + this.meta.size + " under " + this.depth             + "]") +
-        (this.subst.length == 0 ? "" : " [Vars: " + this.subst.map( (e,i) => i+"->"+e.pp()).join(' , ') + "]");
+        (this.subst.length == 0 ? "" : " [Vars: " + this.subst.map( (e,i) => i+"->"+ (e === null ? 'itself' : e.pp())).join(' , ') + "]");
   }
   
   substVar(db) {
@@ -273,7 +310,7 @@ class Context {
   }
   
   shift_extend() {
-    return new Context( this.meta, this.depth+1, this.subst.map((s) => new ShiftedState(s,1)).concat( new ShiftedState(null,0) ), );
+    return new Context( this.meta, this.depth+1, this.subst.map((s) => new ShiftedState(s,1)).concat( new ShiftedState(null,0) ) );
   }
   
   apply(term, depth=0) {
@@ -479,29 +516,17 @@ class ReductionEngine {
           if (!meta_state) { return state; }
           const args = state.head.args.map( (t)=>new State(t, state.ctxt) );
           const meta_subst_state = meta_state.meta_apply(args);
-          // FIXME: in case of joker, the apply is different : args are simply put in the context
-          // FIXME: in case of joker matching a ShiftedState, this is different again
-          meta_subst_state.stack = state.stack.concat(meta_subst_state.stack);
           state.link_to(meta_subst_state);
           break;
         case "Var":
           if (state.head.index >= state.ctxt.subst.length) {
             return state;
           }
-          const nst = state.ctxt.substVar(state.head.index);
-          if (nst.state === null) {
+          const subst_state = state.ctxt.substVar(state.head.index);
+          if (subst_state.state === null) {
             return state;
           } else {
-            if (!state.stack.length) {
-              state.link_to(nst);
-            } else if (nst instanceof State) {
-              state.head = nst.head;
-              state.ctxt = nst.ctxt;
-              state.stack = state.stack.concat(nst2.args);
-            } else {
-              state.head = nst.to_term();
-              state.ctxt = new Context();
-            }
+            state.link_to(subst_state);
           }
           break;
         default: return state; // Any other construction
@@ -519,16 +544,12 @@ class ReductionEngine {
     // Truncate to keep only the first [arity] arguments from the top of the stack
     const truncated_stack = state.stack.slice(state.stack.length-dtree.arity);
     // Running the decision tree with the given args (in order)
-    console.log( " ".repeat(logdepth)+"RW "+state.head.name, state.pp());
     logdepth += 1;
     let [rule, meta_subst] = this.exec_dtree(dtree.tree,truncated_stack);
     logdepth -= 1;
     if (!rule) {
-      console.log( " ".repeat(logdepth)+"> NORew");
-    } else {
-      console.log( " ".repeat(logdepth)+"> Rule "+rule.name);
+      return null;
     }
-    if (!rule) { return null; }
     state.head = rule.rhs;
     state.stack = state.stack.slice(0,state.stack.length-rule.stack.length);
     state.ctxt = new Context(meta_subst);
@@ -570,16 +591,16 @@ class ReductionEngine {
         let matched = stack[m.index];
         if (m.joker_match) {
           // "joker match" : the meta var is applied to all locally bounded variables in their DB index order
-          // we reuse the state
-          matched = new JokerState(matched, m.depth);
+          // we try to reuse the state if it is applied to the same arguments on the RHS
+          matched = new SimpleMatch(matched, m.depth);
         } else {
           try {
-            matched = new MetaState(matched.to_term(), m.subst);
+            matched = new ComplexMatch(matched.to_term(), m.subst);
           } catch(e) {
             if (e.title != 'MetaMatchFailed') { throw(e); }
             try {
               //console.log("Computing NF to match", matched.to_term()," with ", m.subst);
-              matched = new MetaState( this.nf_state(matched).to_term(), m.subst);
+              matched = new ComplexMatch( this.nf_state(matched).to_term(), m.subst);
             } catch(e) {
               if (e.title != 'MetaMatchFailed') { throw(e); }
               return this.exec_dtree(dtree.def, stack);
@@ -596,7 +617,7 @@ class ReductionEngine {
           // We need to check that   t <<->> u{ 1 <- 2, 0 <- 1}
           // or, equivalently, that  u <<->> t{ 2 <- 1, 1 <- 0}
           const matched_args = m.args.map( (j) => Var(j) );
-          if (!this.are_convertible(prev_matched.meta_apply(matched_args).to_term(), matched.term)) {
+          if (!this.are_convertible(prev_matched.meta_apply(matched_args).to_term(), matched.meta_apply(matched_args).to_term())) {
             return this.exec_dtree(dtree.def,stack);
           }
         } else {

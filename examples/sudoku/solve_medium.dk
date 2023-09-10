@@ -14,4 +14,5 @@ medium_sudoku :=
     (l X X 9   8 X X   X 3 6)
     (l X X X   3 X 6   X 9 X);
 
+// Should solve in around 15s
 #EVAL solve_sudo medium_sudoku;
