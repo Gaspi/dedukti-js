@@ -110,6 +110,31 @@ function specialize(m,j,cons,index,extra_cols) {
     });
 }
 
+/** Checks that given term array [args] are distinct locally bounded variables [a_0, ..., a_n]
+    Returns an array A such that:
+    - A[a_i] is an unnamed var of index i
+    - A[b] is undefined for all variables b distinct from the a_i
+    Example:
+    Input:
+      args = [ z[2], y[0] ]
+      depth = 3
+    Ouput:
+      [ 1, undefined, 0 ]
+*/
+function get_meta_match(args, depth) {
+  const res = new Array(depth);
+  args.forEach( function (a,i) {
+    if (a.c !== 'Var' || a.index >= depth) {
+      fail("MetaMatch","Expected a locally bounded variable, got:"+pp_term(a));
+    } else if (res[a.index] != undefined) {
+      fail("MetaMatch","Expected distinct variables, got "+pp_term(a)+"twice");
+    } else {
+      res[a.index] = i;
+    }
+  });
+  return res;
+}
+
 function compute_matching_problem(row,depths,def=null) {
   const mvars = [];
   for (let i = 0; i < row.cols.length; i++) {

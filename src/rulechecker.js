@@ -15,21 +15,58 @@ function vars_to_meta(term, ctx_size, depth=0) {
   return s(term,depth);
 }
 
+
 /** For all [args] = [t_0, ..., t_n]
     Returns the substitution { t_i : MVar(i) | t_i is a variable below depth [depth] }
 */
 function get_partial_meta_match(args, depth) {
   const res = {};
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
+  args.forEach( function(a,i) {
     if (a.c === 'Var' && a.index < depth) {
       res[a.index] = MVar(i);
     }
-  }
+  });
   return res;
 }
 
-// Checks whether the given term is a non-pattern meta-variable instance.
+/** Matches all variables in [term] to the corresponding meta variable in [map]
+    Variables beyond [depth] are shifted down by [depth], others raise an error if unmatched.
+    Example:
+      Input:
+        term = x:A -> f x[0] y[1] z[3] u[4]
+        map = [ 1, undefined, 0 ]
+        arity = 2
+        depth = 3
+      Output:
+        x:A -> f x[0] ?[2] ?[1] u[3]
+      This would be used to perform to the matching of the term
+      again some pattern X[ z[2], y[0] ]
+*/
+function meta_match(term, map, arity, depth) {
+  if (depth == 0) { return term; }
+  function mm(t,d) {
+    switch (t.c) {
+      case "Var":
+        if (t.index < d) { return t; }
+        if (t.index >= d + depth) { return Var(t.index-depth+arity, t.preferred_name); }
+        const i = map[t.index - d];
+        if (i === undefined) {
+          fail('MetaMatchFailed',"Unexpected locally bounded variable ["+pp_term(t)+"]." );
+        } else {
+          return Var(i+d);
+        }
+      case "All" : return All(t.name, mm(t.dom,d), mm(t.cod,d+1));
+      case "Lam" : return Lam(t.name, t.type && mm(t.type,d) , mm(t.body,d+1) );
+      case "App" : return App( mm(t.func,d) , mm(t.argm,d) );
+      case "MVar": return MVar(t.name, t.args.map( (t)=>mm(t,d) ));
+      default: return t;
+    }
+  }
+  return mm(term,0);
+}
+
+/** Checks whether the given term is a non-pattern meta-variable instance.
+*/
 function is_non_pattern_instance(term) {
   // Applied meta-variable are offending
   if (term.c === 'App') {

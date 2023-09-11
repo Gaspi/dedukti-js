@@ -13,6 +13,12 @@ function filter_rules(rules,arity) {
   return [ res , max ];
 }
 
+// Note : meta-substitution are done "by name" > avoid capture !
+//     f X[] Y[] { X => t, Y => u } --> f t u
+// meta-variable instantiation is done "by DB index"
+//     X[t,u] { X[x,y] => f x y } --> f x[0] y[1] { [0] => t, [1] => u }
+
+
 /** A term representation for faster computation:
     - provides easy access to its "head"
     - can be reduced in place
@@ -64,8 +70,25 @@ class State {
     return this.head.index;
   }
   
+  getHeadDom() {
+    return new State(this.head.dom, this.ctxt);
+  }
+  
+  getHeadType() {
+    return new State(this.head.type, this.ctxt);
+  }
+  
+  getHeadArgs() {
+    const ctxt = this.ctxt;
+    return this.head.args.map( (a)=>new State(a, ctxt) );
+  }
+  
   getHeadBody() {
     return new State(this.head.body, this.ctxt.shift_extend());
+  }
+  
+  getHeadCod() {
+    return new State(this.head.cod, this.ctxt.shift_extend());
   }
   
   nbArgs() {
@@ -117,7 +140,7 @@ class State {
     } else if (state instanceof State) {
       this.head = state.head;
       this.ctxt = state.ctxt;
-      this.stack = state.stack.concat(this.stack);
+      this.stack = this.stack.concat(state.stack);
     } else {
       this.head = state.to_term();
       this.ctxt = new Context();
@@ -310,7 +333,7 @@ class Context {
   }
   
   shift_extend() {
-    return new Context( this.meta, this.depth+1, this.subst.map((s) => new ShiftedState(s,1)).concat( new ShiftedState(null,0) ) );
+    return new Context( this.meta, this.depth+1, [new ShiftedState(null,0)].concat(this.subst.map((s) => new ShiftedState(s,1))) );
   }
   
   apply(term, depth=0) {
@@ -448,10 +471,11 @@ class ReductionEngine {
   
   // Reduces a term until a normal form is found
   whnf(term) { return this.whnf_state( new State(term) ).to_term(); }
-    nf(term) { return this.nf_state(   new State(term) ).to_term(); }
+    nf(term) { return   this.nf_state( new State(term) ).to_term();}
   
-  // Computes the strong normal form of term given in state representation: [head,stack]
-  // Updates the [state] Array in place
+  
+  /** Computes the strong normal form of a state
+  */
   nf_state(state) {
     //console.log("NF: "+state.pp(), state);
     this.whnf_state(state);
@@ -461,13 +485,20 @@ class ReductionEngine {
     for (let i=0; i < s.stack.length; i++) { s.stack[i] = this.nf_state(s.stack[i]); };
     switch (s.head.c) {
       case "All":
-        s.head = All(s.head.name, this.nf(s.head.dom), this.nf(s.head.cod));
+        s.head = All(
+          s.head.name,
+          this.nf_state( s.getHeadDom() ).to_term(),
+          this.nf_state( s.getHeadCod() ).to_term());
         break;
       case "Lam":
-        s.head = Lam(s.head.name, this.nf(s.head.type), this.nf(s.head.body));
+        s.head = Lam(
+          s.head.name,
+          this.nf_state( s.getHeadType() ).to_term(),
+          this.nf_state( s.getHeadBody() ).to_term());
         break;
       case "MVar":
-        s.head = MVar(s.head.name, s.args.map(this.nf));
+        s.head = MVar(s.head.name,
+          s.getHeadArgs().map( (e)=> this.nf_state(e).to_term()));
         break;
       case "App":
         throw("This should not happen");
@@ -544,15 +575,18 @@ class ReductionEngine {
     // Truncate to keep only the first [arity] arguments from the top of the stack
     const truncated_stack = state.stack.slice(state.stack.length-dtree.arity);
     // Running the decision tree with the given args (in order)
+    console.log(" ".repeat(logdepth)+"Rewriting: "+pp_term(state.to_term()) );
     logdepth += 1;
     let [rule, meta_subst] = this.exec_dtree(dtree.tree,truncated_stack);
     logdepth -= 1;
     if (!rule) {
+      console.log(" ".repeat(logdepth)+"NoRew");
       return null;
     }
     state.head = rule.rhs;
     state.stack = state.stack.slice(0,state.stack.length-rule.stack.length);
     state.ctxt = new Context(meta_subst);
+    console.log( " ".repeat(logdepth)+"RW:"+rule.name+" > "+pp_term(state.to_term()) );
     return rule.name;
   }
   
@@ -568,13 +602,13 @@ class ReductionEngine {
           stack.push( whnf.getHeadBody() );
           return this.exec_dtree(dtree.Lam,stack);
         case 'Ref':
-          if (!dtree.Ref                          ) { return this.exec_dtree(dtree.def,stack); }
+          if (!dtree.Ref                                   ) { return this.exec_dtree(dtree.def,stack); }
           if (!dtree.Ref[whnf.getHeadName()]               ) { return this.exec_dtree(dtree.def,stack); }
           if (!dtree.Ref[whnf.getHeadName()][whnf.nbArgs()]) { return this.exec_dtree(dtree.def,stack); }
           whnf.forEachArg((e)=>stack.push(e));
           return this.exec_dtree(dtree.Ref[whnf.getHeadName()][whnf.nbArgs()],stack);
         case 'Var':
-          if (!dtree.Var                           ) { return this.exec_dtree(dtree.def,stack); }
+          if (!dtree.Var                                    ) { return this.exec_dtree(dtree.def,stack); }
           if (!dtree.Var[whnf.getHeadIndex()]               ) { return this.exec_dtree(dtree.def,stack); }
           if (!dtree.Var[whnf.getHeadIndex()][whnf.nbArgs()]) { return this.exec_dtree(dtree.def,stack); }
           whnf.forEachArg((e)=>stack.push(e));
