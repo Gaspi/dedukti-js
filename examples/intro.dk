@@ -1,110 +1,30 @@
-//---------------------    Digits     -----------------;
-Digit : Type;
-0 : Digit;
-1 : Digit;
-2 : Digit;
-3 : Digit;
-4 : Digit;
-5 : Digit;
-6 : Digit;
-7 : Digit;
-8 : Digit;
-9 : Digit;
+U : Type;
+#CONST T : U -> Type;
+nat : U;
+0 : T nat;
+S : T nat -> T nat;
 
-//-----------------    Readable nats     --------------;
-N : Digit -> Type;
-PNat : Type := a:Digit -> N a;
+e : u:U -> T u -> T u;
+: e * 0 --> 0;
 
-: N 0 --> PNat;
-: N 1 --> PNat;
-: N 2 --> PNat;
-: N 3 --> PNat;
-: N 4 --> PNat;
-: N 5 --> PNat;
-: N 6 --> PNat;
-: N 7 --> PNat;
-: N 8 --> PNat;
-: N 9 --> PNat;
-
-Nat := PNat -> PNat;
+  f : (u:U -> T u ) ->  T nat;
+: f   (u   => X[u]) --> X[nat];
 
 
-zero : Nat := (x => x 0);
-one  : Nat := (x => x 1);
-923453 : Nat := (x => x 9 2 3 4 5 3);
+P : U -> Type;
+g : (u:U -> T u -> (T u -> T u) -> P u) -> P nat;
+: g (u => zero => succ => X[zero,succ]) --> X[0,S];
+
+h : (u:U -> T u) -> T nat;
+: h (u => X) --> X;
 
 
-//-----------------    Folding function     -----------;
+A : Type;
+B : Type;
+a : A;
+i : (A -> B) -> (B -> A) -> A;
+: i (x => X[x]) (y => X[y]) --> X[ X[a] ];
 
-fold_left : (d:Digit) -> (Digit -> N d -> N d) -> N d -> PNat;
-: fold_left d f a d --> a;
-: fold_left d f a 0 --> fold_left d f (f 0 a);
-: fold_left d f a 1 --> fold_left d f (f 1 a);
-: fold_left d f a 2 --> fold_left d f (f 2 a);
-: fold_left d f a 3 --> fold_left d f (f 3 a);
-: fold_left d f a 4 --> fold_left d f (f 4 a);
-: fold_left d f a 5 --> fold_left d f (f 5 a);
-: fold_left d f a 6 --> fold_left d f (f 6 a);
-: fold_left d f a 7 --> fold_left d f (f 7 a);
-: fold_left d f a 8 --> fold_left d f (f 8 a);
-: fold_left d f a 9 --> fold_left d f (f 9 a);
-
-//fold_left d f a x0...xn   reduces to    f xn (f ... (f x0 a)) ;
-
-fold_right : (d:Digit) -> (d:Digit -> N d -> N d) -> N d -> PNat;
-: fold_right d f a d --> a;
-: fold_right d f a 0 --> f 0 (fold_right d f a);
-: fold_right d f a 1 --> f 1 (fold_right d f a);
-: fold_right d f a 2 --> f 2 (fold_right d f a);
-: fold_right d f a 3 --> f 3 (fold_right d f a);
-: fold_right d f a 4 --> f 4 (fold_right d f a);
-: fold_right d f a 5 --> f 5 (fold_right d f a);
-: fold_right d f a 6 --> f 6 (fold_right d f a);
-: fold_right d f a 7 --> f 7 (fold_right d f a);
-: fold_right d f a 8 --> f 8 (fold_right d f a);
-: fold_right d f a 9 --> f 9 (fold_right d f a);
-
-//fold_right d f a x0...xn   reduces to    f x0 (f ... (f xn a)) ;
-
-
-
-//Building Nats from digit;
-
-10n_i : n:Nat -> d:Digit -> x:PNat -> N d
-     := n     => d       => x      => n x d;
-
-as_d : Digit -> Digit;
-: N (as_d d) --> PNat;
-: as_d 0 --> 0;
-: as_d 1 --> 1;
-: as_d 2 --> 2;
-: as_d 3 --> 3;
-: as_d 4 --> 4;
-: as_d 5 --> 5;
-: as_d 6 --> 6;
-: as_d 7 --> 7;
-: as_d 8 --> 8;
-: as_d 9 --> 9;
-
-
-carry : PNat -> PNat;
-
-rebuild : d:Digit -> N d -> N d;
-: rebuild 0 (x => carry n[x])  --> x => n[1] x;
-: rebuild 1 (x => carry n[x])  --> x => n[2] x;
-: rebuild 2 (x => carry n[x])  --> x => n[3] x;
-: rebuild 3 (x => carry n[x])  --> x => n[4] x;
-: rebuild 4 (x => carry n[x])  --> x => n[5] x;
-: rebuild 5 (x => carry n[x])  --> x => n[6] x;
-: rebuild 6 (x => carry n[x])  --> x => n[7] x;
-: rebuild 7 (x => carry n[x])  --> x => n[8] x;
-: rebuild 8 (x => carry n[x])  --> x => n[9] x;
-: rebuild 9 (x => carry n[x])  --> carry n[0];
-: rebuild d n --> n;
-
-nat : Digit;
-: N nat --> Nat;
-
-inc (n:Nat) : Nat := n (fold_right nat rebuild carry) nat;
-
-#EVAL inc zero;
+: A --> B;
+m : A -> A;
+#EVAL i (x => m x) (y => m y);

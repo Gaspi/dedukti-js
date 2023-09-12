@@ -154,7 +154,7 @@ class AssumptionSet {
   // Check where the terms can be decided convertible using the given assumptions
   // And assuming meta-variable !j for j < i can be substituted (in the LHS only)
   // The meta-substitution S is updated with the required substitutions
-  // if [i] is omitted : all varialbe !j can be substituted
+  // if [i] is omitted : all variables !j can be substituted
   are_convertible_unify(t1, t2, S, i) {
     t1 = this.msubst(t1);
     t2 = this.msubst(t2);

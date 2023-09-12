@@ -43,15 +43,17 @@ class State {
     }
     this._head = this.head;
     this._ctxt = this.ctxt;
+    this._shifted = [this];
   }
   
-  check_memoization() {
-    if (this._head === this.head && this._ctxt === this.ctxt) { return; }
-    this._terms = [];
-    this._heads = [];
-    this._head = this.head;
-    this._ctxt = this.ctxt;
+  getShifted(s) {
+    if (!this._shifted[s]) {
+      this._shifted[s] = new ShiftedState(this, s);
+    }
+    return this._shifted[s];
   }
+  getState() { return this; }
+  getShift() { return 0; }
   
   pp() {
     return pp_term(this.head) + (this.stack.length ? " with " + this.stack.length + " args" : "") + this.ctxt.pp();
@@ -111,6 +113,14 @@ class State {
     return this.stack.map( (e)=>e.to_term(s) ).reduceRight(App, this._heads[s] );
   }
   
+  check_memoization() {
+    if (this._head === this.head && this._ctxt === this.ctxt) { return; }
+    this._terms = [];
+    this._heads = [];
+    this._head = this.head;
+    this._ctxt = this.ctxt;
+  }
+  
   // Memoised version
   // TODO: detect closed terms (unchanged by shifting) and avoid computing their shifted versions at all
   to_term(s=0) {
@@ -137,6 +147,8 @@ class State {
       this.shift = 0;
       this.__proto__ = ShiftedState.prototype;
       this.compress();
+      this._shifted.forEach(function(e) { e.state = state; });
+      delete this._shifted;
     } else if (state instanceof State) {
       this.head = state.head;
       this.ctxt = state.ctxt;
@@ -145,7 +157,6 @@ class State {
       this.head = state.to_term();
       this.ctxt = new Context();
     }
-    
   }
 }
 
@@ -155,6 +166,10 @@ class ShiftedState {
     this.shift = shift;
     this.compress();
   }
+  
+  getShifted(s) { return this.state.shifted(this.shift+s); }
+  getState() { return this.state; }
+  getShift() { return this.shift; }
   
   pp() {
     if (this.state === null) {
@@ -253,43 +268,38 @@ class ComplexMatch {
   }
 }
 
+function meta_appply_subst(args, s) {
+  const state = s.getState();
+  // Create a new context based on the provided arguments substituted in
+  // [ s1, Shifted(null, 0), Shifted(null, 1), Shifted(s2,2), Shifted(null, 2), Shifted(null, 3), Shifted(s3,4) ]  <- [a,b,c]
+  // [ s1, a, b, s2, c, Shifted(null, 0), Shifted(s3,1) ]
+  let arg_i = 0;
+  console.log(state.ctxt.subst);
+  const new_subst = state.ctxt.subst.map( function (e,i) {
+    const nshift = e.getShift() - arg_i;
+    if (arg_i < args.length && e.getState() === null) { e = args[arg_i++]; }
+    console.log(e);
+    return e.getShifted(nshift);
+  });
+  // assert arg_i == args.length
+  const new_ctxt = new Context(state.ctxt.meta, state.ctxt.depth - args.length, new_subst);
+  res_state = new State(state.head, new_ctxt, state.stack.map((e)=> meta_appply_subst(args,e)));
+  return res_state.getShifted(s.getShift());
+}
+
 /** Class for specific match X[x,y,...] where x,y,... are all locally bounded variables in their DB order
     In that case, no need we record the state
  */
 class SimpleMatch {
-  constructor(state, depth) {
+  constructor(state) {
     this.state = state;
-    this.shift = 0;
-    //this.depth = depth;
   }
-  compress() {
-    if (this.state instanceof ShiftedState) {
-      this.shift = this.state.shift;
-      this.state = this.state.state;
-    }
-  }
+  
   meta_apply(args) {
     if (args.every( (e,i) => e.c === 'Var' && e.index === i )) {
       return this.state;
     } else {
-      compress();
-      const subst = new Array(state.ctxt.subst.length);
-      // Create a new context based on the provided arguments substituted in
-      // [ Shifted(s3,4), Shifted(null, 3), s2, Shifted(null, 2), Shifted(null, 1), s1 ]  <- [a,b,c]
-      // [ Shifted(s3,1), c, s2, b, a, s1 ]  <- [a,b,c]
-      let arg_i = 0;
-      for (let i = subst.length-1; i >= 0; i--) {
-        const e = state.ctxt.subst[i];
-        if (e instanceof ShiftedState) {
-          const nshift = e.shift - arg_i;
-          subst[i] = new ShiftedState(e.state || args[args.length-++arg_i], nshift);
-        } else {
-          // asserts arg_i == 0;
-          subst[i] = e;
-        }
-      }
-      // assert arg_i == args.length
-      return new State(this.term, new Context(new Map(), 0, subst) );
+      return meta_appply_subst(args, this.state);
     }
   }
 }
@@ -575,18 +585,18 @@ class ReductionEngine {
     // Truncate to keep only the first [arity] arguments from the top of the stack
     const truncated_stack = state.stack.slice(state.stack.length-dtree.arity);
     // Running the decision tree with the given args (in order)
-    console.log(" ".repeat(logdepth)+"Rewriting: "+pp_term(state.to_term()) );
-    logdepth += 1;
+    //console.log(" ".repeat(logdepth)+"Rewriting: "+pp_term(state.to_term()) );
+    //logdepth += 1;
     let [rule, meta_subst] = this.exec_dtree(dtree.tree,truncated_stack);
-    logdepth -= 1;
+    //logdepth -= 1;
     if (!rule) {
-      console.log(" ".repeat(logdepth)+"NoRew");
+      //console.log(" ".repeat(logdepth)+"NoRew");
       return null;
     }
     state.head = rule.rhs;
     state.stack = state.stack.slice(0,state.stack.length-rule.stack.length);
     state.ctxt = new Context(meta_subst);
-    console.log( " ".repeat(logdepth)+"RW:"+rule.name+" > "+pp_term(state.to_term()) );
+    //console.log( " ".repeat(logdepth)+"RW:"+rule.name+" > "+pp_term(state.to_term()) );
     return rule.name;
   }
   
@@ -626,7 +636,7 @@ class ReductionEngine {
         if (m.joker_match) {
           // "joker match" : the meta var is applied to all locally bounded variables in their DB index order
           // we try to reuse the state if it is applied to the same arguments on the RHS
-          matched = new SimpleMatch(matched, m.depth);
+          matched = new SimpleMatch(matched);
         } else {
           try {
             matched = new ComplexMatch(matched.to_term(), m.subst);
@@ -651,6 +661,7 @@ class ReductionEngine {
           // We need to check that   t <<->> u{ 1 <- 2, 0 <- 1}
           // or, equivalently, that  u <<->> t{ 2 <- 1, 1 <- 0}
           const matched_args = m.args.map( (j) => Var(j) );
+          console.log(prev_matched.meta_apply(matched_args), matched.meta_apply(matched_args));
           if (!this.are_convertible(prev_matched.meta_apply(matched_args).to_term(), matched.meta_apply(matched_args).to_term())) {
             return this.exec_dtree(dtree.def,stack);
           }

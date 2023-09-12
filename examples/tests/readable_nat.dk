@@ -105,7 +105,7 @@ rebuild : d:Digit -> N d -> N d;
 nat : Digit;
 : N nat --> Nat;
 
-inc (n:Nat) : Nat := n (fold_right nat rebuild carry) nat;
+inc (n:Nat) : Nat := n (fold_right nat rebuild (x => carry x)) nat;
 
 
 
