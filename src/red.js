@@ -167,7 +167,7 @@ class ShiftedState {
     this.compress();
   }
   
-  getShifted(s) { return this.state.shifted(this.shift+s); }
+  getShifted(s) { return this.state.getShifted(this.shift+s); }
   getState() { return this.state; }
   getShift() { return this.shift; }
   
@@ -268,23 +268,26 @@ class ComplexMatch {
   }
 }
 
+/** Substitute the states in the array [args]
+  for the first non-already-substituted bound variables in state [s]
+*/
 function meta_appply_subst(args, s) {
   const state = s.getState();
   // Create a new context based on the provided arguments substituted in
   // [ s1, Shifted(null, 0), Shifted(null, 1), Shifted(s2,2), Shifted(null, 2), Shifted(null, 3), Shifted(s3,4) ]  <- [a,b,c]
   // [ s1, a, b, s2, c, Shifted(null, 0), Shifted(s3,1) ]
   let arg_i = 0;
-  console.log(state.ctxt.subst);
   const new_subst = state.ctxt.subst.map( function (e,i) {
     const nshift = e.getShift() - arg_i;
-    if (arg_i < args.length && e.getState() === null) { e = args[arg_i++]; }
-    console.log(e);
+    if (arg_i < args.length && e.getState() === null) {
+      e = args[arg_i++];
+    }
     return e.getShifted(nshift);
   });
   // assert arg_i == args.length
   const new_ctxt = new Context(state.ctxt.meta, state.ctxt.depth - args.length, new_subst);
-  res_state = new State(state.head, new_ctxt, state.stack.map((e)=> meta_appply_subst(args,e)));
-  return res_state.getShifted(s.getShift());
+  return_state = new State(state.head, new_ctxt, state.stack.map((e)=> meta_appply_subst(args,e)));
+  return return_state.getShifted(s.getShift());
 }
 
 /** Class for specific match X[x,y,...] where x,y,... are all locally bounded variables in their DB order
@@ -307,7 +310,7 @@ class SimpleMatch {
 
 // A context is a mapping of some meta-variables and variables in a term
 // to states (which can be computed to term if needed).
-// Meta-variables are mapped to states whose [arity] first variables are meant to be replaced
+// Meta-variables are mapped to "matches" (SimpleMatch / ComplexMatch) which are meat_applied to states
 // It can be applied to terms.
 class Context {
   constructor(meta=new Map(), depth=0, subst=[]) {
@@ -360,30 +363,31 @@ class Context {
           return (ct === cta ? t : MVar(t.name, args));
         } else {
           ct += 1; // Meta-substitution effectuée
+          // FIXME : meta_apply expects states, not terms
           return meta_state.meta_apply(args).to_term(d+self.depth);
         }
       } else if (t.c === "Var") {
         const db = t.index - d;
         if (db < 0) { // Locally bounded variable
           return t;
-        } else if (db >= self.subst.length) { // Free variable
+        } else if (db >= self.subst.length) { // Free variable from outside the context
           if (varshift == 0) {
             return t;
           } else {
-            ct += 1; // Shifting effectué
+            ct += 1; // Variable shifting occurs
             return Var(t.index - varshift);
           }
         } else {
           const st = self.substVar(db);
-          if (st.state === null) {
+          if (st.state === null) { // The variable is free in the context
             if (db == st.shift) {
               return t; //
             } else {
-              ct += 1; // Shifting effectué sur une variable localement liées mais sous un lambda substitué
+              ct += 1; // Variable shifting occurs
               return Var(t.index - db + st.shift);
             }
           } else {
-            ct += 1; // Substitution effectuée
+            ct += 1; // Variable substitution occurs
             return st.to_term(d);
           }
         }
@@ -555,8 +559,7 @@ class ReductionEngine {
         case "MVar":
           const meta_state = state.ctxt.meta.get( state.head.name );
           if (!meta_state) { return state; }
-          const args = state.head.args.map( (t)=>new State(t, state.ctxt) );
-          const meta_subst_state = meta_state.meta_apply(args);
+          const meta_subst_state = meta_state.meta_apply(state.getHeadArgs());
           state.link_to(meta_subst_state);
           break;
         case "Var":
@@ -660,7 +663,7 @@ class ReductionEngine {
           // Then prev_matched.map = [1, 0, undefined]  and  prev_matched.term = u
           // We need to check that   t <<->> u{ 1 <- 2, 0 <- 1}
           // or, equivalently, that  u <<->> t{ 2 <- 1, 1 <- 0}
-          const matched_args = m.args.map( (j) => Var(j) );
+          const matched_args = m.args.map( (j) => new State(Var(j)) );
           console.log(prev_matched.meta_apply(matched_args), matched.meta_apply(matched_args));
           if (!this.are_convertible(prev_matched.meta_apply(matched_args).to_term(), matched.meta_apply(matched_args).to_term())) {
             return this.exec_dtree(dtree.def,stack);
