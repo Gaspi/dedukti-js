@@ -1,0 +1,8 @@
+A : Type;
+B : Type;
+
+a : A;
+
+h : (A -> B) -> (B -> A) -> A;
+: h (x => X[x]) (y => X[y]) --> X[ X[a] ];
+

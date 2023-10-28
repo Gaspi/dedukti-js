@@ -1,0 +1,11 @@
+S : Type;
+
+nat : S;
+T : S -> Type;
+
+0 : T nat;
+
+P : S -> Type;
+f : (s:S -> T s -> (T s -> T s) -> P s) -> P nat;
+: f (s => z => n => X[z,n]) --> X[0,x=>x];
+

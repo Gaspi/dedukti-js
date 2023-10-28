@@ -1,0 +1,10 @@
+S : Type;
+
+nat : S;
+T : S -> Type;
+
+0 : T nat;
+
+e : (s:S -> T s) -> T nat;
+: e (s => X[s]) --> X[nat];
+
