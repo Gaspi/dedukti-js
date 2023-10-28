@@ -45,7 +45,7 @@ class State {
     this._ctxt = this.ctxt;
     this._shifted = [this];
   }
-  
+
   getShifted(s) {
     if (!this._shifted[s]) {
       this._shifted[s] = new ShiftedState(this, s);
@@ -54,53 +54,53 @@ class State {
   }
   getState() { return this; }
   getShift() { return 0; }
-  
+
   pp() {
     return pp_term(this.head) + (this.stack.length ? " with " + this.stack.length + " args" : "") + this.ctxt.pp();
   }
-  
+
   getHeadC() {
     return this.head.c;
   }
-  
-  
+
+
   getHeadName() {
     return this.head.name;
   }
-  
+
   getHeadIndex() {
     return this.head.index;
   }
-  
+
   getHeadDom() {
     return new State(this.head.dom, this.ctxt);
   }
-  
+
   getHeadType() {
     return new State(this.head.type, this.ctxt);
   }
-  
+
   getHeadArgs() {
     const ctxt = this.ctxt;
     return this.head.args.map( (a)=>new State(a, ctxt) );
   }
-  
+
   getHeadBody() {
     return new State(this.head.body, this.ctxt.shift_extend());
   }
-  
+
   getHeadCod() {
     return new State(this.head.cod, this.ctxt.shift_extend());
   }
-  
+
   nbArgs() {
     return this.stack.length;
   }
-  
+
   forEachArg(f) {
     this.stack.forEach(f);
   }
-  
+
   // Term conversion with memoisation of shifted versions of head and global terms to avoid recomputing and have maximum sharing
   _to_term(s=0) {
     // Memoisation of head shifted versions
@@ -112,7 +112,7 @@ class State {
     }
     return this.stack.map( (e)=>e.to_term(s) ).reduceRight(App, this._heads[s] );
   }
-  
+
   check_memoization() {
     if (this._head === this.head && this._ctxt === this.ctxt) { return; }
     this._terms = [];
@@ -120,7 +120,7 @@ class State {
     this._head = this.head;
     this._ctxt = this.ctxt;
   }
-  
+
   // Memoised version
   // TODO: detect closed terms (unchanged by shifting) and avoid computing their shifted versions at all
   to_term(s=0) {
@@ -130,9 +130,9 @@ class State {
     }
     return this._terms[s];
   }
-  
+
   compress() {}
-  
+
   // Substitute the head of this state to a an other state
   link_to(state) {
     if (!this.stack.length) {
@@ -166,11 +166,11 @@ class ShiftedState {
     this.shift = shift;
     this.compress();
   }
-  
+
   getShifted(s) { return this.state.getShifted(this.shift+s); }
   getState() { return this.state; }
   getShift() { return this.shift; }
-  
+
   pp() {
     if (this.state === null) {
       return "[X]";
@@ -178,7 +178,7 @@ class ShiftedState {
       return "[+"+this.shift+"] "+this.state.pp();
     }
   }
-  
+
   // Graph compression
   compress() {
     if (this.state instanceof ShiftedState) {
@@ -187,35 +187,35 @@ class ShiftedState {
       this.state = this.state.state;
     }
   }
-  
+
   // Overriding term conversion
   to_term(s=0) {
     return this.state.to_term(s+this.shift);
   }
-  
+
   getHeadC() {
     return this.state.getHeadC();
   }
-  
+
   getHeadName() {
     return this.state.getHeadName();
   }
-  
+
   getHeadIndex() {
     return this.state.getHeadIndex()+this.shift;
   }
-  
+
   getHeadBody() {
     if (!this.state.getHeadBody()) {
       throw("debug");
     }
     return new ShiftedState(this.state.getHeadBody(), this.shift);
   }
-  
+
   nbArgs() {
     return this.state.nbArgs();
   }
-  
+
   forEachArg(f) {
     this.state.forEachArg( (a)=> f(new ShiftedState(a, this.shift)));
   }
@@ -227,7 +227,7 @@ function check_meta_match(term, map) {
   function chk(t,d) {
     switch (t.c) {
       case "Var" :
-        if (t.index >= d && t.index < d + depth && map[t.index - d] === undefined) { 
+        if (t.index >= d && t.index < d + depth && map[t.index - d] === undefined) {
           fail('MetaMatchFailed',"Unexpected locally bounded variable ["+pp_term(t)+"]." );
         }
         break;
@@ -297,7 +297,7 @@ class SimpleMatch {
   constructor(state) {
     this.state = state;
   }
-  
+
   meta_apply(args) {
     if (args.every( (e,i) => e.c === 'Var' && e.index === i )) {
       return this.state;
@@ -321,16 +321,16 @@ class Context {
     this.subst = subst;
     // Array of states substituable to meta-variables
   }
-  
+
   isEmpty() {
     return this.meta.size == 0 && this.depth == 0 && this.subst.length == 0;
   }
-  
+
   pp() {
     return (this.meta.size == 0 ? "" : " [Meta: " + this.meta.size + " under " + this.depth             + "]") +
         (this.subst.length == 0 ? "" : " [Vars: " + this.subst.map( (e,i) => i+"->"+ (e === null ? 'itself' : e.pp())).join(' , ') + "]");
   }
-  
+
   substVar(db) {
     const st = this.subst[db];
     if (st === undefined) {
@@ -340,15 +340,15 @@ class Context {
     }
     return st;
   }
-  
+
   extend(s) {
     return new Context( this.meta, this.depth, [s].concat( this.subst ) );
   }
-  
+
   shift_extend() {
     return new Context( this.meta, this.depth+1, [new ShiftedState(null,0)].concat(this.subst.map((s) => new ShiftedState(s,1))) );
   }
-  
+
   shift_extend_d(d) {
     const new_subst = new Array(d+this.subst.length);
     for (let i = 0; i < d; i++) {
@@ -359,7 +359,7 @@ class Context {
     }
     return new Context(this.meta, this.depth+d, new_subst);
   }
-  
+
   apply(term, depth=0) {
     const self = this;
     const varshift = this.subst.length - this.depth;
@@ -426,15 +426,15 @@ class Context {
 class ReductionEngine {
   red = new Map();
   constructor() {}
-  
-  // Get info about a symbol (adds a new entry if needed) 
+
+  // Get info about a symbol (adds a new entry if needed)
   get(name) {
     if (!this.red.has(name)) {
       this.red.set(name, { rules:[], decision_trees:[], injective:false });
     }
     return this.red.get(name);
   }
-  
+
   add_new_rule(rule) {
     // Find the head symbol and the stack of the rule
     const [head,stack] = get_head(rule.lhs);
@@ -457,7 +457,7 @@ class ReductionEngine {
     // Empty DTs are generated for arities up to that of the new rule
     for (let i = dts.length; i <= arity; i++) { dts.push(null); }
   }
-  
+
   // Injectivity declaration / checking
   is_injective(name) { return this.get(name).injective; }
   declare_injective(name) { this.get(name).injective=true; }
@@ -467,7 +467,7 @@ class ReductionEngine {
     }
     this.declare_injective(name);
   }
-  
+
   // Get the decision tree of given symbol when applied to this many arguments
   get_decision_tree(name,arity) {
     const r = this.red.get(name);
@@ -486,19 +486,19 @@ class ReductionEngine {
     }
     return dts[arity];
   }
-  
+
   // Ideas : add a depth d to states to allow easy lambda deconstruction
   // Add a depth map to states in WHNF : shifting memoisation of terms
   // Ensure term sharing is preserved by non-modifying shifting and (meta-)substitions
   // Use a single function for shifting under depth + subst + meta subst (one pass).
   // Add memoisation of term representation (for sharing) and of whnf state (true/false)
   // Move all this to a class
-  
+
   // Reduces a term until a normal form is found
   whnf(term) { return this.whnf_state( new State(term) ).to_term(); }
     nf(term) { return   this.nf_state( new State(term) ).to_term();}
-  
-  
+
+
   /** Computes the strong normal form of a state
   */
   nf_state(state) {
@@ -532,7 +532,7 @@ class ReductionEngine {
     state.compress();
     return state;
   }
-  
+
   /** Computes the weak head normal form of term given in state representation: [head,stack,subst,meta_subst]
     * Updates the [state] Array in place
     * [subst] and [meta_subst] may be shared among states and must not be modified in place
@@ -613,7 +613,7 @@ class ReductionEngine {
     //console.log( " ".repeat(logdepth)+"RW:"+rule.name+" > "+pp_term(state.to_term()) );
     return rule.name;
   }
-  
+
   // Running the dtree using the given arguments (in reverse order)
   exec_dtree(dtree, stack) {
     if (!dtree) { return [null,null]; }
@@ -688,7 +688,7 @@ class ReductionEngine {
       fail("DTreeExec","Unexpected DTree constructor: "+dtree.c);
     }
   }
-  
+
   // Checks if two terms are convertible
   are_convertible(u, v) {
     //console.log("Conv:",pp_term(u),"<-?->",pp_term(v));
@@ -703,7 +703,7 @@ class ReductionEngine {
           //console.log("Mismatch: ",pp_term(whnf_a)," <-/-> ", pp_term(whnf_b));
           return false;
         }
-      } 
+      }
     }
     return true;
   }
