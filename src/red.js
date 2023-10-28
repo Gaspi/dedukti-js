@@ -349,6 +349,17 @@ class Context {
     return new Context( this.meta, this.depth+1, [new ShiftedState(null,0)].concat(this.subst.map((s) => new ShiftedState(s,1))) );
   }
   
+  shift_extend_d(d) {
+    const new_subst = new Array(d+this.subst.length);
+    for (let i = 0; i < d; i++) {
+      new_subst[i] = new ShiftedState(null,i);
+    }
+    for (let i = d; i < d+this.subst.length; i++) {
+      new_subst[i+d] = new ShiftedState( this.subst[i], d);
+    }
+    return new Context(this.meta, this.depth+d, new_subst);
+  }
+  
   apply(term, depth=0) {
     const self = this;
     const varshift = this.subst.length - this.depth;
@@ -357,14 +368,14 @@ class Context {
     function e(t,d) {
       const cta = ct;
       if (t.c == "MVar") {
-        const args = t.args.map( (t)=>e(t,d) );
         const meta_state = self.meta.get(t.name);
         if (!meta_state) {
+          const args = t.args.map( (t)=>e(t,d) );
           return (ct === cta ? t : MVar(t.name, args));
         } else {
           ct += 1; // Meta-substitution effectuée
-          // FIXME : meta_apply expects states, not terms
-          return meta_state.meta_apply(args).to_term(d+self.depth);
+          const state_args = t.args.map( (t)=>new State(t,self.shift_extend_d(d)) );
+          return meta_state.meta_apply(state_args).to_term(d+self.depth);
         }
       } else if (t.c === "Var") {
         const db = t.index - d;
