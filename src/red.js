@@ -675,7 +675,6 @@ class ReductionEngine {
           // We need to check that   t <<->> u{ 1 <- 2, 0 <- 1}
           // or, equivalently, that  u <<->> t{ 2 <- 1, 1 <- 0}
           const matched_args = m.args.map( (j) => new State(Var(j)) );
-          console.log(prev_matched.meta_apply(matched_args), matched.meta_apply(matched_args));
           if (!this.are_convertible(prev_matched.meta_apply(matched_args).to_term(), matched.meta_apply(matched_args).to_term())) {
             return this.exec_dtree(dtree.def,stack);
           }

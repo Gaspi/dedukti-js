@@ -146,28 +146,25 @@ class AssumptionSet {
   
   equals(u, v) {
     return equals(u, v) ||
-      this.assumed_conv.some( ([a,b]) =>
-          (
-            ( equals(a, u) && equals(b, v) )
-            ||
-            ( equals(a, v) && equals(b, u) )
-          )
-        );
+      this.assumed_conv.some(function ([a,b]) {
+        return (equals(a, u) && equals(b, v)) || (equals(a, v) && equals(b, u));
+      });
   }
   
   // Check wether the terms can be decided convertible using the given assumptions
   are_convertible(u, v) {
-    //console.log("Conv:",pp_term(u),"<-?->",pp_term(v));
     const acc = [ [ this.msubst(u), this.msubst(v)] ];
     while (acc.length > 0) {
       const [a,b] = acc.pop();
-      //console.log("Equal:",pp_term(a),"=?=",pp_term(b));
+      //console.log("Conv:",pp_term(a),"<<-?->>",pp_term(b));
       if (!this.equals(a,b)) {
         const whnf_a = this.red.whnf(a);
         const whnf_b = this.red.whnf(b);
-        if (!same_head(whnf_a, whnf_b, acc)) {
-          //console.log("Mismatch: ",pp_term(whnf_a)," <-/-> ", pp_term(whnf_b));
-          return false;
+        if (!this.equals(whnf_a,whnf_b)) {
+          if (!same_head(whnf_a, whnf_b, acc)) {
+            //console.log("Mismatch: ",pp_term(whnf_a)," <-/-> ", pp_term(whnf_b));
+            return false;
+          }
         }
       }
     }
@@ -185,6 +182,7 @@ class AssumptionSet {
     const acc = [ [this.msubst(u),this.msubst(v), 0] ];
     while (acc.length > 0) {
       const [a,b,d] = acc.pop();
+      //console.log("ConvU:",pp_term(a),"<<-?->>",pp_term(b));
       if (equals(a,b)) { continue; }
       const whnfa = this.red.whnf(a);
       if (whnfa.c==='MVar' &&
@@ -321,6 +319,7 @@ class RuleChecker {
   // If [expected_type] is provided then the inferred type is checked to be unifiable with it
   // for some extension of S
   rhs_infer_mvar_type(assumptions, term, ctx, expected_type) {
+    //console.log("RHS Infer MVar: Inferring the type of meta-variable instance `" + pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
     for (let k = 0; k < assumptions.assumed_types.length; k++) {
       const assumption = assumptions.assumed_types[k];
       if (assumption.name !== term.name) { continue; }
@@ -359,12 +358,16 @@ class RuleChecker {
         }
         while (!aux(this)) {}
         const inf_final_type = meta_map_subst(assumption.type, S);
-        if (!expected_type) { return inf_final_type; }
-        // If we need to check a type for the result, then unify the inferred one
-        // allowing for even further extension of S
-        if (!assumptions.are_convertible_unify(inf_final_type,expected_type,S)) { fail(); }
-        // check that the extension of S is still ok (might require even further extension of S)
-        while (!aux(this)) {}
+        if (!expected_type) { // Infer mode
+          return inf_final_type;
+        } else { // Check mode
+          // If we need to check a type for the result, then unify the inferred one
+          // allowing for even further extension of S
+          if (!assumptions.are_convertible_unify(inf_final_type,expected_type,S)) { fail(); }
+          // check that the extension of S is still ok (might require even further extension of S)
+          while (!aux(this)) {}
+          return; // The check is successful, return
+        }
       } catch (e) {} // Ignore errors and proceed with the next assumption instead
     }
     fail("RHS Infer","Cannot infer the type of meta-variable instance `" +
@@ -522,10 +525,7 @@ class RuleChecker {
       }
       this.rhs_check(assumptions, term.body, type.cod, extend(ctx, [type.name, type.dom]));
     } else if (term.c === "MVar") {
-      if (!this.rhs_infer(assumptions, term, ctx, type)) {
-        fail("RHS Check", "Could not check that meta-variable `"+pp_term(term, ctx)+"` has type `"+pp_term(type,ctx)+"`.\n"+
-          pp_context(ctx) + assumptions.pp());
-      }
+      this.rhs_infer_mvar_type(assumptions, term, ctx, type); // This call is actually a check
     } else {
       const term_t = this.rhs_infer(assumptions, term, ctx);
       if (!assumptions.are_convertible(type, term_t)) {
@@ -613,11 +613,6 @@ class RuleChecker {
         this.rhs_infer_unify(assumptions, type.dom, ctx, S, i);
       }
       this.rhs_check_unify(assumptions, term.body, type.cod, extend(ctx, [type.name, type.dom]), S, i);
-    } else if (term.c === "MVar") {
-      if (!this.rhs_infer_unify(assumptions, term, ctx, type, S, i)) {
-        fail("RHS Check Unify", "Could not check that meta-variable `"+pp_term(term, ctx)+"` has type `"+pp_term(type,ctx)+"`.\n"+
-          pp_context(ctx) + assumptions.pp());
-      }
     } else {
       const term_t = this.rhs_infer_unify(assumptions, term, ctx, S, i);
       if (!assumptions.are_convertible_unify(type, term_t, S, i)) {
