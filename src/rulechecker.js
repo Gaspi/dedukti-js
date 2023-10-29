@@ -316,13 +316,12 @@ class RuleChecker {
   //////////////////////////////////////////////////////////////
 
   // Returns the first inferred type for metavariable [term] = X[a_0, ..., a_n]
-  // The typing assumptions are scan to find one that allows to infer a type for [term]
+  // The typing assumptions are scanned to find one that allows to infer a type for [term]
   // for some substitution S of the locally bounded variables
   // If [expected_type] is provided then the inferred type is checked to be unifiable with it
   // for some extension of S
   rhs_infer_mvar_type(assumptions, term, ctx, expected_type) {
     for (let k = 0; k < assumptions.assumed_types.length; k++) {
-
       const assumption = assumptions.assumed_types[k];
       if (assumption.name !== term.name) { continue; }
       const arity = assumption.args.length;
@@ -351,13 +350,11 @@ class RuleChecker {
           const i = unchecked.findIndex((t,i)=>t && S.has('!'+i));
           if (i < 0) { return true; } // if there are none, then the work is done: proceed
           // else compute the expected type substituted with the partial substitution S
-          const type_of_ith = meta_map_subst(assumption.ctx[i],S);
-          // Infer the type of the value substituted with i in S
-          const inferred_type = self.rhs_infer(assumptions, S.get('!'+i), ctx);
+          
           // Check that this value S[i] has the expected type...
           // ... for some assignation of the variables j<i in S !
-          if (!assumptions.are_convertible_unify(type_of_ith, inferred_type, S, i)) { fail(); }
-          // TODO : improve the above check...
+          const type_of_ith = meta_map_subst(assumption.ctx[i],S);
+          self.rhs_check_unify(assumptions, S.get('!'+i), type_of_ith, ctx, S, i);
           unchecked[i] = false; // Never check this index again
         }
         while (!aux(this)) {}
@@ -368,14 +365,12 @@ class RuleChecker {
         if (!assumptions.are_convertible_unify(inf_final_type,expected_type,S)) { fail(); }
         // check that the extension of S is still ok (might require even further extension of S)
         while (!aux(this)) {}
-      } catch (e) {
-        // Ignore errors and proceed with the next assumption instead
-      }
+      } catch (e) {} // Ignore errors and proceed with the next assumption instead
     }
     fail("RHS Infer","Cannot infer the type of meta-variable instance `" +
       pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
   }
-
+  
 
   //////////////////////////////////////////////////////////////
   ////////////////////       LHS  Checking  ////////////////////
@@ -476,8 +471,8 @@ class RuleChecker {
         }
         return cod_sort;
       case "Lam":
-        if (term.type === null) {
-          fail("Infer","Can't infer non-annotated lambda `" +
+        if (term.type === null || (term.type.c == 'MVar' && term.type.joker) ) {
+          fail("Infer","Can't infer unannotated lambda `" +
             pp_term(term,ctx) + "`.\n" + pp_context(ctx)+ assumptions.pp());
         } else {
           const body_t = this.rhs_infer(assumptions, term.body, extend(ctx, [term.name, term.type]));
@@ -533,7 +528,6 @@ class RuleChecker {
       }
     } else {
       const term_t = this.rhs_infer(assumptions, term, ctx);
-      console.log(type, term_t);
       if (!assumptions.are_convertible(type, term_t)) {
         fail("RHS Check", "Type mismatch on `"+pp_term(term, ctx)+"`.\n"+
           "- Expect = " + pp_term(type  , ctx)+"\n"+
@@ -543,6 +537,97 @@ class RuleChecker {
     }
   }
 
+
+  //////////////////////////////////////////////////////////////
+  /////////////   RHS  Checking with Unification   /////////////
+  //////////////////////////////////////////////////////////////
+
+  // Infers the type of a RHS meta-term assuming the given assumptions
+  // (that were inferred from typing the LHS)
+  rhs_infer_unify(assumptions, term, ctx, S, i) {
+    //console.log("RHS Infer Unify",term.c,term,pp_term(term,ctx));
+    switch (term.c) {
+      case "Knd": fail("RHS Infer Unify","Cannot infer the type of Kind !");
+      case "Typ": return Knd();
+      case "All":
+        const dom_sort = assumptions.whnf( this.rhs_infer_unify(assumptions, term.dom, ctx, S, i) );
+        const cod_sort = assumptions.whnf( this.rhs_infer_unify(assumptions, term.cod, extend(ctx, [term.name, term.dom]), S, i) );
+        if (dom_sort.c !== "Typ") {
+          fail("RHS Infer Unify","Domain of forall is not a type: `" +
+            pp_term(term, ctx) + "`.\n" + pp_context(ctx)+ assumptions.pp());
+        }
+        if (cod_sort.c !== "Typ" && cod_sort.c !== "Knd") {
+          fail("RHS Infer Unify","Codomain of forall is neither a type nor a kind: `" +
+            pp_term(term, ctx) + "`.\n" + pp_context(ctx)+ assumptions.pp());
+        }
+        return cod_sort;
+      case "Lam":
+        if (term.type === null || (term.type.c == 'MVar' && term.type.joker) ) {
+          fail("RHS Infer Unify","Can't infer unannotated lambda `" +
+            pp_term(term,ctx) + "`.\n" + pp_context(ctx)+ assumptions.pp());
+        } else {
+          const body_t = this.rhs_infer_unify(assumptions, term.body, extend(ctx, [term.name, term.type]), S, i);
+          const term_t = All(term.name, term.type, body_t);
+          this.rhs_infer_unify(assumptions, term_t, ctx, S, i);
+          return term_t;
+        }
+      case "App":
+        const func_t = assumptions.whnf(this.rhs_infer_unify(assumptions, term.func, ctx, S, i));
+        if (func_t.c !== "All") {
+          fail("RHS Infer Unify","Non-function application on `" +
+            pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
+        }
+        this.rhs_check_unify(assumptions, term.argm, func_t.dom, ctx, S, i);
+        return subst(func_t.cod, term.argm);
+      case "Ref": return this.env.do_get(term.name).type;
+      case "Var":
+        const ctxt_type = get_term(ctx, term.index);
+        if(!ctxt_type) {
+          fail("RHS Infer Unify","Cannot infer the type of free variable `" +
+            pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
+        }
+        return ctxt_type;
+      case "MVar": return this.rhs_infer_mvar_type(assumptions, term, ctx);
+      default:
+        fail("RHS Infer Unify","Unable to infer type of `" +
+          pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
+    }
+  }
+
+  // Check the type of a RHS meta-term assuming the given assumptions
+  // (that were inferred from typing the LHS)
+  // Allows to perform unification in S
+  rhs_check_unify(assumptions, term, expected_type, ctx, S, i) {
+    //console.log("CheckWithAssumption",pp_term(term,ctx), pp_term(expected_type,ctx));
+    const type = assumptions.whnf(expected_type);
+    if (type.c === "All" && term.c === "Lam") {
+      this.rhs_infer_unify(assumptions, type, ctx, S, i);
+      if (term.type.joker) {
+        term.type = type.dom;
+      } else if (!assumptions.are_convertible_unify(term.type, type.dom, S, i)) {
+        fail("RHS Check Unify", "Incompatible annotation `"+pp_term(term, ctx)+"`.\n"+
+          "- Expect = " + pp_term(type.dom , ctx)+"\n"+
+          "- Actual = " + pp_term(term.type, ctx)+"\n"+
+          pp_context(ctx) + assumptions.pp());
+      } else {
+        this.rhs_infer_unify(assumptions, type.dom, ctx, S, i);
+      }
+      this.rhs_check_unify(assumptions, term.body, type.cod, extend(ctx, [type.name, type.dom]), S, i);
+    } else if (term.c === "MVar") {
+      if (!this.rhs_infer_unify(assumptions, term, ctx, type, S, i)) {
+        fail("RHS Check Unify", "Could not check that meta-variable `"+pp_term(term, ctx)+"` has type `"+pp_term(type,ctx)+"`.\n"+
+          pp_context(ctx) + assumptions.pp());
+      }
+    } else {
+      const term_t = this.rhs_infer_unify(assumptions, term, ctx, S, i);
+      if (!assumptions.are_convertible_unify(type, term_t, S, i)) {
+        fail("RHS Check Unify", "Type mismatch on `"+pp_term(term, ctx)+"`.\n"+
+          "- Expect = " + pp_term(type  , ctx)+"\n"+
+          "- Actual = " + pp_term(term_t, ctx)+"\n"+
+          pp_context(ctx) + assumptions.pp());
+      }
+    }
+  }
 
   //////////////////////////////////////////////////////////////
   ////////////////////       Rule  Checking  ///////////////////
