@@ -24,7 +24,7 @@ function get_head(t) {
   return [t,args];
 }
 
-// Pre-scoping objects that can be either references or locally bounded variables
+// Pre-scoping objects that can be either references or locally bound variables
 function PreScope(name) { return {c:'PreScope', name}; }
 function PreRef(name)   { return {c:'PreRef', name}; }
 

@@ -30,8 +30,8 @@ min: Nat -> Nat -> Nat;
 #CHECK x : Nat |- min x (s x) != x;
 
 // A meta-variable that is only applied to some (not all) of the
-// available locally bounded variable will only match expressions
-// that depend on the provided locally bounded variables
+// available locally bound variable will only match expressions
+// that depend on the provided locally bound variables
 constant : (Nat -> Nat) -> Nat;
 : constant (x => C) --> z;
 #CHECK            constant (x => z) == z;
@@ -39,7 +39,7 @@ constant : (Nat -> Nat) -> Nat;
 #CHECK a : Nat |- constant (x => a) == z;
 
 // Note: instances of nameless meta-variables `*` are always assumed
-// applied to all available locally bounded variables.
+// applied to all available locally bound variables.
 zero : (Nat -> Nat) -> Nat;
 : zero (x => *) --> z;
 #CHECK            zero (x => z) == z;

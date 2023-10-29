@@ -228,7 +228,7 @@ function check_meta_match(term, map) {
     switch (t.c) {
       case "Var" :
         if (t.index >= d && t.index < d + depth && map[t.index - d] === undefined) {
-          fail('MetaMatchFailed',"Unexpected locally bounded variable ["+pp_term(t)+"]." );
+          fail('MetaMatchFailed',"Unexpected locally bound variable ["+pp_term(t)+"]." );
         }
         break;
       case "All" :
@@ -290,7 +290,7 @@ function meta_appply_subst(args, s) {
   return return_state.getShifted(s.getShift());
 }
 
-/** Class for specific match X[x,y,...] where x,y,... are all locally bounded variables in their DB order
+/** Class for specific match X[x,y,...] where x,y,... are all locally bound variables in their DB order
     In that case, no need we record the state
  */
 class SimpleMatch {
@@ -379,7 +379,7 @@ class Context {
         }
       } else if (t.c === "Var") {
         const db = t.index - d;
-        if (db < 0) { // Locally bounded variable
+        if (db < 0) { // Locally bound variable
           return t;
         } else if (db >= self.subst.length) { // Free variable from outside the context
           if (varshift == 0) {
@@ -648,7 +648,7 @@ class ReductionEngine {
         const m = dtree.match[i];
         let matched = stack[m.index];
         if (m.joker_match) {
-          // "joker match" : the meta var is applied to all locally bounded variables in their DB index order
+          // "joker match" : the meta var is applied to all locally bound variables in their DB index order
           // we try to reuse the state if it is applied to the same arguments on the RHS
           matched = new SimpleMatch(matched);
         } else {

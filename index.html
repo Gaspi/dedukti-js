@@ -315,6 +315,14 @@ function log(status,ln,title,msg) {
     };
     l.onmouseout = function() { hovering.style.display = 'none'; };
     l.onclick = function() { div.scrollIntoView(); };
+    
+    // TODO: wait for rendering here somehow
+    // 
+    // window.requestAnimationFrame ?
+    // https://swizec.com/blog/how-to-wait-for-dom-elements-to-show-up-in-modern-browsers/
+    // 
+    // setTimeout ?
+    // https://stackoverflow.com/questions/1209689/how-can-i-force-the-browser-to-redraw-while-my-script-is-doing-some-heavy-proces
   }
 }
 

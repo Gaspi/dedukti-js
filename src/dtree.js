@@ -110,7 +110,7 @@ function specialize(m,j,cons,index,extra_cols) {
     });
 }
 
-/** Checks that given term array [args] are distinct locally bounded variables [a_0, ..., a_n]
+/** Checks that given term array [args] are distinct locally bound variables [a_0, ..., a_n]
     Returns an array A such that:
     - A[a_i] is an unnamed var of index i
     - A[b] is undefined for all variables b distinct from the a_i
@@ -125,7 +125,7 @@ function get_meta_match(args, depth) {
   const res = new Array(depth);
   args.forEach( function (a,i) {
     if (a.c !== 'Var' || a.index >= depth) {
-      fail("MetaMatch","Expected a locally bounded variable, got:"+pp_term(a));
+      fail("MetaMatch","Expected a locally bound variable, got:"+pp_term(a));
     } else if (res[a.index] != undefined) {
       fail("MetaMatch","Expected distinct variables, got "+pp_term(a)+"twice");
     } else {

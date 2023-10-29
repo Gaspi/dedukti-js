@@ -78,7 +78,7 @@ type: Type;
 #CONST term: type -> Type;
 
 // Dedukti supports matching against higher-order patterns
-// Meta-variable may depend on a list of locally bounded variables
+// Meta-variable may depend on a list of locally bound variables
 //   A meta-variable instance is written :  Var[x,y,z, ...]
 app: a:type -> b:type -> term (arrow a b) -> term a -> term b;
 lambda: a:type -> b:type -> (term a -> term b) -> term (arrow a b);

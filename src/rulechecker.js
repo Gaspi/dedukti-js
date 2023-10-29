@@ -51,7 +51,7 @@ function meta_match(term, map, arity, depth) {
         if (t.index >= d + depth) { return Var(t.index-depth+arity, t.preferred_name); }
         const i = map[t.index - d];
         if (i === undefined) {
-          fail('MetaMatchFailed',"Unexpected locally bounded variable ["+pp_term(t)+"]." );
+          fail('MetaMatchFailed',"Unexpected locally bound variable ["+pp_term(t)+"]." );
         } else {
           return Var(i+d);
         }
@@ -317,7 +317,7 @@ class RuleChecker {
 
   // Returns the first inferred type for metavariable [term] = X[a_0, ..., a_n]
   // The typing assumptions are scanned to find one that allows to infer a type for [term]
-  // for some substitution S of the locally bounded variables
+  // for some substitution S of the locally bound variables
   // If [expected_type] is provided then the inferred type is checked to be unifiable with it
   // for some extension of S
   rhs_infer_mvar_type(assumptions, term, ctx, expected_type) {
