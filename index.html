@@ -155,6 +155,12 @@ const quick_loads = [
   ] },
 ];
 
+// Call fn after DOM is finished updating
+function call_after_DOM_updated(fn) {
+  const aux = function () {window.requestAnimationFrame(fn)}
+  window.requestAnimationFrame(aux);
+}
+
 // Functions to populate the dropdown menu
 function add_quick_load(e, element, prefix) {
   const li = document.createElement('li');
@@ -204,16 +210,38 @@ function set_button_mode(mode) {
 
 function check_editor() {
   set_button_mode('checking');
-  setTimeout(function() {
+  
+  // Wait for DOM to update button to "Checking"
+  call_after_DOM_updated( function() {
+    // Main processing loop
     try {
-      process_all_instructions();
+    
+      // Parsing of input text code
+      const instructions = parse(editor.textContent);
+      log('ok',null,"Parsing","done.");
+      
+      // Reseting the signature
+      sig = new Signature();
+      
+      // Checking each instructions with the signature
+      sig.check_instructions(instructions,log,load_module);
+      
+      
+        instructions.forEach((ins) => this.check_instruction(ins,log,load_module,namespace));
+        this.env.all_proven(namespace);
+      
+      const chrono = (new Date()).getTime() - sig.start_time.getTime();
+      log('ok',null,"File Checking","All done ("+chrono+"ms) !");
+      
+      
       set_button_mode('checked');
     } catch(e) {
       log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");
       set_button_mode('error');
       throw(e);
     }
-  }, 10);
+    
+  });
 }
 
 // Source load from URL
@@ -282,6 +310,7 @@ function clear_logs() {
     editor_wrapper.removeChild(editor_wrapper.children[i]);
   }
 }
+
 // Display a new block in the loading area
 function log(status,ln,title,msg) {
   const div = document.createElement('div');
@@ -315,14 +344,6 @@ function log(status,ln,title,msg) {
     };
     l.onmouseout = function() { hovering.style.display = 'none'; };
     l.onclick = function() { div.scrollIntoView(); };
-    
-    // TODO: wait for rendering here somehow
-    // 
-    // window.requestAnimationFrame ?
-    // https://swizec.com/blog/how-to-wait-for-dom-elements-to-show-up-in-modern-browsers/
-    // 
-    // setTimeout ?
-    // https://stackoverflow.com/questions/1209689/how-can-i-force-the-browser-to-redraw-while-my-script-is-doing-some-heavy-proces
   }
 }
 
@@ -352,19 +373,6 @@ function load_module(module_name) {
   xhttp.send();
   if (!res) { fail("Load","Failed to load file `"+url+"`."); }
   return parse(res);
-}
-
-// Main processing loop
-function process_all_instructions() {
-  // Parsing of input text code
-  let instructions = parse(editor.textContent);
-  log('ok',null,"Parsing","done.");
-  // Reseting the signature
-  sig = new Signature();
-  // Checking each instructions with the signature
-  sig.check_instructions(instructions,log,load_module);
-  const chrono = (new Date()).getTime() - sig.start_time.getTime();
-  log('ok',null,"File Checking","All done ("+chrono+"ms) !");
 }
 
 const dragenter = (e) => {

@@ -200,6 +200,8 @@ class Signature {
       fail("Instruction","Unexpected set of instructions. The checker is not used properly...");
     }
     instructions.forEach((ins) => this.check_instruction(ins,log,load,namespace));
+    
+    // Check that all required proofs were provided at some points
     this.env.all_proven(namespace);
   }
   

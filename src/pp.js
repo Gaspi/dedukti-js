@@ -23,9 +23,9 @@ function pp_term(term, ctx = Ctx()) {
       }
       return pp_term(term,ctx)+" "+text;
     case "All":
-      let dom = pp_term(term.dom,ctx);
+      let dom = (term.name ? "("+term.name+" : "+pp_term(term.dom,ctx)+")" : pp_term_wp(term.dom,ctx));
       let cod = pp_term(term.cod,extend(ctx, [term.name, null]));
-      return (term.name ? "("+term.name+" : "+dom+")" : dom) + " -> "+cod;
+      return dom+" -> "+cod;
     case "Lam":
       let body = pp_term(term.body, extend(ctx, [term.name, null]));
       return "(" + (term.type ? "("+term.name+" : "+pp_term(term.type,ctx)+")" : term.name) + " => "+body+")";
