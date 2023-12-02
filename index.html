@@ -224,15 +224,12 @@ function check_editor() {
       sig = new Signature();
       
       // Checking each instructions with the signature
-      sig.check_instructions(instructions,log,load_module);
-      
-      
-        instructions.forEach((ins) => this.check_instruction(ins,log,load_module,namespace));
-        this.env.all_proven(namespace);
+      for (const log of sig.check_instructions(instructions,load_module)) {
+        log_object(log);
+      }
       
       const chrono = (new Date()).getTime() - sig.start_time.getTime();
       log('ok',null,"File Checking","All done ("+chrono+"ms) !");
-      
       
       set_button_mode('checked');
     } catch(e) {
@@ -345,6 +342,14 @@ function log(status,ln,title,msg) {
     l.onmouseout = function() { hovering.style.display = 'none'; };
     l.onclick = function() { div.scrollIntoView(); };
   }
+}
+
+function log_object(o) {
+  let msg = o.msg;
+  while (o.ins.length > 1) {
+    msg = "While loading module `"+o.ins.pop().module+"`, "+msg;
+  }
+  return log(o.status, o.ln || o.ins[0].ln, o.title, o.msg);
 }
 
 // Create a Parser object from our grammar.

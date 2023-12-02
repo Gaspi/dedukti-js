@@ -88,7 +88,7 @@ class Signature {
   }
   
   // Process a single unscoped instruction
-  check_instruction(ins,log=console.log,load=null,namespace="") {
+  *check_instruction(ins, load=null, namespace="", ins_stack = []) {
     try {
       this.env.scope_instruction(ins, namespace);
       switch (ins.c) {
@@ -97,86 +97,85 @@ class Signature {
           this.declare_symbol(ins);
           if (ins.constant) {
             this.red.declare_constant(ins.name);
-            log('ok',ins.ln,"Constant symbol declared","`"+ins.name+"` with type " +pp_term(ins.type) );
+            yield { status:'ok', title:"Constant symbol declared", msg:`\`${ins.name}\` with type ${pp_term(ins.type)}` };
           } else if (ins.def) {
             this.rulechecker.declare_rule( Rew(ins.ln, Ref(ins.name),ins.def,ins.name+"_def") );
             if (ins.theorem) {
-              log('ok',ins.ln,"Theorem proven","`"+ins.name+"` proves "+pp_term(ins.type) );
+              yield { status:'ok', title:"Theorem proven", msg:`\`${ins.name}\` proves ${pp_term(ins.type)}` };
             } else {
-              log('ok',ins.ln,"Symbol defined","`"+ins.name+ "` as " + pp_term(ins.def));
+              yield { status:'ok', title:"Symbol defined", msg:`\`${ins.name}\` as ${pp_term(ins.def)}`};
             }
           } else {
             if (ins.theorem) {
-              log('ok',ins.ln,"Proof required","`"+ins.name+"` for theorem"+pp_term(ins.type) );
+              yield { status:'ok', title:"Proof required", msg:`\`${ins.name}\` for theorem ${pp_term(ins.type)}`};
             } else {
-              log('ok',ins.ln,"Symbol declared","`"+ins.name+"` with type " +pp_term(ins.type) );
+              yield { status:'ok', title:"Symbol declared", msg:`\`${ins.name}\` with type ${pp_term(ins.type)}`};
             }
           }
           break;
         case "DeclConst":
           this.red.declare_constant(ins.name);
-          log('ok',ins.ln,"Symbol declared constant","`"+ins.name+"`");
+          yield { status:'ok', title:"Symbol declared constant", msg:`\`${ins.name}\``};
           break;
         case "DeclInj":
           this.red.declare_injective(ins.name);
-          log('ok',ins.ln,"Symbol declared injective","`"+ins.name+"` (no check)");
+          yield { status:'ok', title:"Symbol declared injective", msg:`\`${ins.name}\` (no check)`};
           break;
         case "Rew":
           this.rulechecker.declare_rule(ins);
           if (ins.lhs.c==='Ref' && this.env.get(ins.lhs.name).proven) {
+            yield { status:'ok', title:"Theorem proven", msg:`\`${ins.lhs.name}\``};
             log('ok',ins.ln,"Theorem proven",'`'+ins.lhs.name+'`');
           } else {
-            log('ok',ins.ln,"Rewrite rule added",pp_term(ins.lhs)+ " --\> " + pp_term(ins.rhs));
+            yield { status:'ok', title:"Rewrite rule added", msg:`${pp_term(ins.lhs)} --> ${pp_term(ins.rhs)}`};
           }
           break;
         case "Eval":
-          log('info',ins.ln,"Eval",pp_term(this.red.nf(ins.term, ins.ctx), ins.ctx)+"\n"+pp_context(ins.ctx));
+          yield { status:'info', title:"Eval", msg:pp_term(this.red.nf(ins.term, ins.ctx), ins.ctx)+"\n"+pp_context(ins.ctx) };
           break;
         case "Infer":
-          log('info',ins.ln,"Infer",pp_term(this.infer(ins.term, ins.ctx), ins.ctx)+"\n"+pp_context(ins.ctx));
+          yield { status:'info', title:"Infer", msg:pp_term(this.infer(ins.term, ins.ctx), ins.ctx)+"\n"+pp_context(ins.ctx) };
           break;
         case "CheckType":
           this.check(ins.term, ins.type, ins.ctx);
-          log('ok',ins.ln,"CheckType",
-            pp_term(ins.term, ins.ctx)+" has indeed type "+pp_term(ins.type, ins.ctx)+"\n"+
-            pp_context(ins.ctx));
+          yield { status:'ok', title:"CheckType", msg:
+              pp_term(ins.term, ins.ctx)+" has indeed type "+pp_term(ins.type, ins.ctx)+"\n"+
+              pp_context(ins.ctx)
+              };
           break;
         case "CheckConv":
-          if (this.red.are_convertible(ins.lhs, ins.rhs)) {
-            if (ins.cv) {
-              log('ok',ins.ln,"CheckConv",pp_term(ins.lhs,ins.ctx)+" is indeed convertible with "+pp_term(ins.rhs,ins.ctx));
-            } else {
-              log('warn',ins.ln,"CheckConv",pp_term(ins.lhs,ins.ctx)+" is in fact convertible with "+pp_term(ins.rhs,ins.ctx));
-            }
+          if (this.red.are_convertible(ins.lhs, ins.rhs) == ins.cv) {
+            yield { status:'ok', title:"CheckConv",
+              msg:pp_term(ins.lhs,ins.ctx)+" is indeed "+(ins.cv ? "" : "not ")+"convertible with "+pp_term(ins.rhs,ins.ctx)
+              };
           } else {
-            if (ins.cv) {
-              log('warn',ins.ln,"CheckConv",pp_term(ins.lhs,ins.ctx)+" is in fact not convertible with "+pp_term(ins.rhs,ins.ctx));
-            } else {
-              log('ok',ins.ln,"CheckConv",pp_term(ins.lhs,ins.ctx)+" is indeed not convertible with "+pp_term(ins.rhs,ins.ctx));
-            }
+            yield { status:'warn', title:"CheckConv",
+              msg:pp_term(ins.lhs,ins.ctx)+" is in fact "+(ins.cv ? "not " : "")+"convertible with "+pp_term(ins.rhs,ins.ctx)
+              };
           }
           break;
         case "Print":
-          log('info',ins.ln,'Show',pp_term(ins.term));
+          yield { status:'info', title:"Show", msg:pp_term(ins.term) };
           break;
         case "DTree":
-          log('info',ins.ln,'DTree',"Decision tree for symbol `"+ins.name+"`:\n"+pp_dtrees(this.red.get(ins.name).decision_trees));
+          yield { status:'info', title:"DTree", msg:"Decision tree for symbol `"+ins.name+"`:\n"+pp_dtrees(this.red.get(ins.name).decision_trees) };
           break;
         case "Time":
           const d = new Date();
           const dt = d.getTime() - this.time.getTime();
-          log('info',ins.ln,'Time',''+d.toLocaleString()+'  ('+dt+'ms since last clock)');
           this.time = d;
+          yield { status:'info', title:"Time", msg:''+d.toLocaleString()+'  ('+dt+'ms since last clock)' };
           break;
         case "Req":
           if (!load) { fail('Require',"Current setup does not support `#REQUIRE`."); }
-          this.check_instructions(
-            load(ins.module),
-            (status,ln,title,msg) =>log(status,ins.ln,title,"While loading module `"+ins.module+"`, "+msg),
-            load,
-            ins.alias ? ins.alias+(namespace&&'.')+namespace : namespace
-          );
-          log('ok',ins.ln,'Require',"Module `"+ins.module+"` successfully loaded.");
+          for (const log of
+            this.check_instructions( load(ins.module), load,
+              ins.alias ? ins.alias+(namespace&&'.')+namespace : namespace,
+              ins_stack = ins_stack.concat(ins) )
+          ) {
+            yield log;
+          }
+          yield { status:'ok', title:"Require", msg:"Module `"+ins.module+"` successfully loaded." };
           break;
         case "DebugOn":
           debug.enable_log();
@@ -195,11 +194,18 @@ class Signature {
     //*/
   }
   
-  check_instructions(instructions,log=console.log,load=null,namespace="") {
+  *check_instructions(instructions, load=null, namespace="", ins_stack = []) {
     if (!Array.isArray(instructions)) {
       fail("Instruction","Unexpected set of instructions. The checker is not used properly...");
     }
-    instructions.forEach((ins) => this.check_instruction(ins,log,load,namespace));
+    for (const ins of instructions) {
+      for (const log of this.check_instruction(ins, load, namespace, ins_stack)) {
+        if (log !== undefined) {
+          log.ins = ins_stack.concat(ins);
+        }
+        yield log;
+      }
+    };
     
     // Check that all required proofs were provided at some points
     this.env.all_proven(namespace);
