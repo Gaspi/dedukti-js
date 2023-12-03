@@ -208,6 +208,18 @@ function set_button_mode(mode) {
   check_button.innerText = button_style.message;
 }
 
+function log_all_messages(proc, callback) {
+  const message = proc.next();
+  if (message.done) {
+    return callback();
+  } else {
+    log_object(message.value);
+    const fn = function() { log_all_messages(proc, callback) };
+    //const aux = function () {window.requestAnimationFrame(fn)}
+    window.requestAnimationFrame(fn);
+  }
+}
+
 function check_editor() {
   set_button_mode('checking');
   
@@ -224,14 +236,12 @@ function check_editor() {
       sig = new Signature();
       
       // Checking each instructions with the signature
-      for (const log of sig.check_instructions(instructions,load_module)) {
-        log_object(log);
-      }
+      log_all_messages(sig.check_instructions(instructions,load_module), function() {
+        const chrono = (new Date()).getTime() - sig.start_time.getTime();
+        log('ok',null,"File Checking","All done ("+chrono+"ms) !");
+        set_button_mode('checked');
+      });
       
-      const chrono = (new Date()).getTime() - sig.start_time.getTime();
-      log('ok',null,"File Checking","All done ("+chrono+"ms) !");
-      
-      set_button_mode('checked');
     } catch(e) {
       log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");
       set_button_mode('error');
