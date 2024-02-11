@@ -32,7 +32,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - run: mkdir build
-      - run: cp -R "./resources" "./lib" "./examples" "./index.html" build/
+      - run: cp -R "./resources" "./src" "./lib" "./examples" "./index.html" build/
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact
