@@ -106,6 +106,6 @@ f (t:Ty) (x:T t) : T (arr t t):= lam t t (z => x);
 // Note that (for now) the same module can be imported twice with distinct names.
 
 // `#REQUIRE` also allows to check and import ressources from any third party servers
-#REQUIRE "https://gaspi.github.io/examples/theories/pure_lambda_calculus.dk"[lc];
+#REQUIRE "https://gaspi.github.io/dedukti-js/examples/theories/pure_lambda_calculus.dk"[lc];
 #INFER lc.lam;
 // Note : beware of CORS headers preventing such ressource to be received by the webpage.
