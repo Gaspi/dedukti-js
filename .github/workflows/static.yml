@@ -22,16 +22,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Simple build populating build folder with relevant files
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: mkdir build
-      - run: cp -R "./resources" "./lib" "./examples" "./index.html" build/
   # Single deploy job since we're just deploying
   deploy:
-    needs: build
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -39,13 +31,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - run: mkdir build
+      - run: cp -R "./resources" "./lib" "./examples" "./index.html" build/
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload entire repository
-          path: '/build/'
+          path: 'build/'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
