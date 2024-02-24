@@ -9,6 +9,7 @@ function App (func, argm)                 { return {c:'App' , func, argm}; }
 // Chains applications:  app(a,[b,c,d])  returns  App(App(App(a,b),c),d)
 function app(func, args) { return args.reduce(App,func); }
 
+
 // A pattern is a term extended with (potentially anonymous) meta-variables
 // A "joker" is an anonym fully applied meta-variable. A default name and the full list of args are assigned at scoping.
 function MVar(name=null,args=[]) { return {c:'MVar', name, args, joker:false}; }
