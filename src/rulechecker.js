@@ -108,7 +108,7 @@ function meta_map_subst(term, subst, depth=0, to_term=(t)=>t) {
         if (shifts.length == 0) {
           shifts[0] = to_term(subst.get(t.name));
         }
-        shifts[d] = shift(shifts[0], inc=d);
+        shifts[d] = shift(shifts[0], d);
       }
       return meta_map_subst(shifts[d], args);
     } else if (t.c === "All") {

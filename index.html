@@ -81,22 +81,22 @@
   crossorigin="anonymous"
   onerror="this.onerror=null;this.integrity=null;this.src='lib/cdn.jsdelivr.net_npm_bootstrap@4.5.3_dist_js_bootstrap.bundle.min.js';">
 </script>
-<script src="src/utils.js"></script>
-<script src="src/term.js"></script>
-<script src="src/context.js"></script>
-<script src="src/env.js"></script>
-<script src="src/dtree.js"></script>
-<script src="src/red.js"></script>
-<script src="src/pp.js"></script>
-<script src="src/rulechecker.js"></script>
-<script src="src/sig.js"></script>
+<script src="build/src/utils.js"></script>
+<script src="build/src/term.js"></script>
+<script src="build/src/context.js"></script>
+<script src="build/src/env.js"></script>
+<script src="build/src/dtree.js"></script>
+<script src="build/src/red.js"></script>
+<script src="build/src/pp.js"></script>
+<script src="build/src/rulechecker.js"></script>
+<script src="build/src/sig.js"></script>
 
-<script src="resources/moo.js"></script>
-<script src="src/grammar.js"></script>
-<script src="resources/nearley.js"></script>
+<script src="build/resources/moo.js"></script>
+<script src="build/src/grammar.js"></script>
+<script src="build/resources/nearley.js"></script>
 
-<script src="resources/codejar.js"></script>
-<script src="resources/linenumbers.js"></script>
+<script src="build/resources/codejar.js"></script>
+<script src="build/resources/linenumbers.js"></script>
 
 <script>
 // Standard libraries
@@ -209,14 +209,20 @@ function set_button_mode(mode) {
 }
 
 function log_all_messages(proc, callback) {
-  const message = proc.next();
-  if (message.done) {
-    return callback();
-  } else {
-    log_object(message.value);
-    const fn = function() { log_all_messages(proc, callback) };
-    //const aux = function () {window.requestAnimationFrame(fn)}
-    window.requestAnimationFrame(fn);
+  try {
+    const message = proc.next();
+    if (message.done) {
+      return callback();
+    } else {
+      log_object(message.value);
+      const fn = function() { log_all_messages(proc, callback) };
+      //const aux = function () {window.requestAnimationFrame(fn)}
+      window.requestAnimationFrame(fn);
+    }
+  } catch(e) {
+    log('err', e.ln,e.title || 'ERROR', (e.msg || e)+"");
+    set_button_mode('error');
+    throw(e);
   }
 }
 
@@ -224,30 +230,20 @@ function check_editor() {
   set_button_mode('checking');
   
   // Wait for DOM to update button to "Checking"
-  call_after_DOM_updated( function() {
-    // Main processing loop
-    try {
+  call_after_DOM_updated( function() { // Main processing loop
+    // Parsing of input text code
+    const instructions = parse(editor.textContent);
+    log('ok',null,"Parsing","done.");
     
-      // Parsing of input text code
-      const instructions = parse(editor.textContent);
-      log('ok',null,"Parsing","done.");
-      
-      // Reseting the signature
-      sig = new Signature();
-      
-      // Checking each instructions with the signature
-      log_all_messages(sig.check_instructions(instructions,load_module), function() {
-        const chrono = (new Date()).getTime() - sig.start_time.getTime();
-        log('ok',null,"File Checking","All done ("+chrono+"ms) !");
-        set_button_mode('checked');
-      });
-      
-    } catch(e) {
-      log('err',e.ln,e.title || 'ERROR',(e.msg || e)+"");
-      set_button_mode('error');
-      throw(e);
-    }
+    // Reseting the signature
+    sig = new Signature();
     
+    // Checking each instructions with the signature
+    log_all_messages(sig.check_instructions(instructions,load_module), function() {
+      const chrono = (new Date()).getTime() - sig.start_time.getTime();
+      log('ok',null,"File Checking","All done ("+chrono+"ms) !");
+      set_button_mode('checked');
+    });
   });
 }
 

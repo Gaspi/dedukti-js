@@ -1,0 +1,66 @@
+to_term -> _to_term
+to_term -> check_memoization
+to_term -> to_term
+add_new_rule -> get
+are_convertible -> whnf
+check_meta_match -> chk
+chk -> chk
+declare_constant -> declare_injective
+declare_constant -> get
+declare_injective -> get
+
+getHeadBody -> getHeadBody
+getHeadBody -> shift_extend
+getHeadC -> getHeadC
+getHeadCod -> shift_extend
+getHeadIndex -> getHeadIndex
+getHeadName -> getHeadName
+getShifted -> getShifted
+is_injective -> get
+link_to -> compress
+link_to -> to_term
+meta_apply -> meta_appply_subst
+  meta_appply_subst -> getShift
+  meta_appply_subst -> getShifted
+  meta_appply_subst -> getState
+nf -> nf_state
+nf -> to_term
+nf_state -> compress
+nf_state -> getHeadArgs
+nf_state -> getHeadBody
+nf_state -> getHeadCod
+nf_state -> getHeadDom
+nf_state -> getHeadType
+nf_state -> nf_state
+nf_state -> to_term
+nf_state -> whnf_state
+pp -> pp
+whnf -> to_term
+whnf -> whnf_state
+whnf_state -> compress
+whnf_state -> extend
+whnf_state -> get
+whnf_state -> getHeadArgs
+whnf_state -> head_rewrite
+head_rewrite -> exec_dtree
+exec_dtree -> whnf_state
+    
+  head_rewrite -> get_decision_tree
+    get_decision_tree -> filter_rules
+    get_decision_tree -> get -> get
+    exec_dtree -> are_convertible
+    exec_dtree -> exec_dtree
+    exec_dtree -> forEachArg -> forEachArg
+    exec_dtree -> get
+    exec_dtree -> getHeadBody
+    exec_dtree -> getHeadC
+    exec_dtree -> getHeadIndex
+    exec_dtree -> getHeadName
+    exec_dtree -> meta_apply
+    exec_dtree -> nbArgs -> nbArgs
+    exec_dtree -> nf_state
+    exec_dtree -> to_term
+whnf_state -> link_to
+whnf_state -> meta_apply
+whnf_state -> substVar
+whnf_state -> whnf_state

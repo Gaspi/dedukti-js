@@ -4,6 +4,39 @@
  * 
  */
 
+type ExRule = Rule &  { head:Term, stack:any[] };
+
+type RuleRow = { rule:Rule, cols:Term[]}
+type RuleMatrix = { rows: RuleRow[], depths: number[] }
+
+type DTreeTest = {
+  index:number,
+  name:string,
+  subst:number[],
+  depth:number,
+  args: Term[],
+  joker_match: boolean
+}
+
+type DTreeNode = {
+  c:'Switch',
+  index:number
+  Lam ?: DTreeNode,
+  Var ?: { [k:number]: { [k:number]: DTreeNode} },
+  Ref ?: { [k:string]: { [k:number]: DTreeNode} },
+  def: DTreeNode
+} | {
+  c:'Test',
+  match:DTreeTest[],
+  rule:Rule,
+  def:DTreeNode
+} | null
+type DTree = {
+  c:'DTree',
+  arity: number,
+  tree: DTreeNode | null
+}
+
 
 /** Builds the row of the matching matrix corresponding to the given rule
  * 
@@ -13,7 +46,7 @@
  *   Number of columns: should be higher than the rule's stack length
  * 
  */
-function compute_row(rule, arity) {
+function compute_row(rule:ExRule, arity:number) : RuleRow {
   return { rule:rule, cols: Array(arity-rule.stack.length).fill(Joker()).concat(rule.stack) };
 }
 
@@ -28,7 +61,7 @@ function compute_row(rule, arity) {
  * @return
  *   A reduction decision tree ready to be used.
  */
-function compute_decision_tree(rules, arity) {
+function compute_decision_tree(rules:ExRule[], arity:number) : DTree {
   if (rules.length==0) { fail("DTree","Cannot compute decision tree for an empty set of rules."); }
   const mismatch = rules.find( (r) => r.head != rules[0].head );
   if (mismatch) { fail("DTree","Head symbol mismatch found: ["+mismatch.head+"] != ["+rules[0].head+"]."); }
@@ -36,7 +69,7 @@ function compute_decision_tree(rules, arity) {
     rows   : rules.map( (r) => compute_row(r,arity) ),
     depths : Array(arity).fill(0)
   };
-  return {c:'DTree',arity:arity,tree:compute_dtree(matrix)};
+  return {c:'DTree',arity:arity, tree:compute_dtree(matrix)};
 }
 
 /** Computes a decision tree from the given matrix.
@@ -46,15 +79,15 @@ function compute_decision_tree(rules, arity) {
  * @return
  *   A reduction decision tree ready to be used.
  */
-function compute_dtree(m) {
+function compute_dtree(m:RuleMatrix) : DTreeNode {
   if (m.rows.length == 0) { return null; }
   // Find the first column [j] that is not a meta-var in the first row of patterns
   const j = m.rows[0].cols.findIndex((p) => p.c != "MVar");
   if (j<0) {
     return compute_matching_problem(m.rows[0], m.depths,
-      def=compute_dtree({rows:m.rows.slice(1), depths:m.depths.slice(1)}));
+      compute_dtree({rows:m.rows.slice(1), depths:m.depths.slice(1)}));
   } else {
-    const res = { c:'Switch', index:j };
+    const res: DTreeNode = { c:'Switch', index:j, def:null };
     for (let i = 0; i < m.rows.length; i++) {
       const row = m.rows[i];
       const [pat,stack] = get_head(row.cols[j]);
@@ -86,7 +119,7 @@ function compute_dtree(m) {
   }
 }
 
-function specialize_row(cols,j,cons,name,extra_cols) {
+function specialize_row(cols:Term[], j:number, cons:string|null, name:string|number|null, extra_cols:number) {
   const [pat,stack] = get_head(cols[j]);
   if (pat.c == 'MVar') {
     return cols.concat(Array(extra_cols).fill(Joker()));
@@ -98,7 +131,7 @@ function specialize_row(cols,j,cons,name,extra_cols) {
   return ncols;
 }
 
-function specialize(m,j,cons,index,extra_cols) {
+function specialize(m:RuleMatrix, j:number, cons:string|null, index:number|null, extra_cols:number) : DTreeNode {
   const rows = [];
   for (let i = 0; i < m.rows.length; i++) {
     const cols = specialize_row(m.rows[i].cols,j,cons,index,extra_cols);
@@ -121,9 +154,9 @@ function specialize(m,j,cons,index,extra_cols) {
     Ouput:
       [ 1, undefined, 0 ]
 */
-function get_meta_match(args, depth) {
+function get_meta_match(args:Term[], depth:number) : number[] {
   const res = new Array(depth);
-  args.forEach( function (a,i) {
+  args.forEach( function (a:Term,i:number) {
     if (a.c !== 'Var' || a.index >= depth) {
       fail("MetaMatch","Expected a locally bound variable, got:"+pp_term(a));
     } else if (res[a.index] != undefined) {
@@ -135,7 +168,7 @@ function get_meta_match(args, depth) {
   return res;
 }
 
-function compute_matching_problem(row,depths,def=null) {
+function compute_matching_problem(row:RuleRow, depths:number[], def:DTreeNode = null) : DTreeNode {
   const mvars = [];
   for (let i = 0; i < row.cols.length; i++) {
     const p = row.cols[i];
@@ -146,7 +179,7 @@ function compute_matching_problem(row,depths,def=null) {
         subst:get_meta_match(p.args, depths[i]),
         depth:depths[i],
         args: p.args,
-        joker_match: p.args.length === depths[i] && p.args.every( (e,i) => e.c === 'Var' && e.index === i)
+        joker_match: p.args.length === depths[i] && p.args.every( (e:Term,i:number) => e.c === 'Var' && e.index === i)
         });
     }
   }
@@ -154,10 +187,10 @@ function compute_matching_problem(row,depths,def=null) {
 }
 
 
-function pp_dtrees(dtrees) {
+function pp_dtrees(dtrees: DTreeNode[]) {
   let res = "Count arguments:\n";
-  function pp(t,s) { res+='  '.repeat(t)+s+"\n"; }
-  function pp_dtree(dtree,t) {
+  function pp(t:number, s:string) { res += '  '.repeat(t)+s+"\n"; }
+  function pp_dtree(dtree:DTreeNode, t:number) {
     if (!dtree) { pp(t,"Fail"); return; }
     if (dtree.c === 'Switch') {
       pp(t,"Look stack["+dtree.index+"]:");
@@ -168,13 +201,13 @@ function pp_dtrees(dtrees) {
       if (dtree.Ref) {
         Object.entries(dtree.Ref).forEach(([ref,dts])=>
           Object.entries(dts).forEach(function([ar,dt]) {
-            pp(t,"Case `"+ref+"`("+ar+" args):");
+            pp(t, `Case [${ref}](${ar} args):`);
             pp_dtree(dt,t+1);
           })
         );
       }
       if (dtree.Var) {
-        Object.entries(dtree.Ref).forEach(([ind,dts])=>
+        Object.entries(dtree.Var).forEach(([ind,dts])=>
           Object.entries(dts).forEach(function([ar,dt]) {
             pp(t,"Case #"+ind+"("+ar+" args):");
             pp_dtree(dt,t+1);
@@ -184,19 +217,18 @@ function pp_dtrees(dtrees) {
     } else if (dtree.c === 'Test') {
       pp(t,"Match:");
       dtree.match.forEach((m)=>
-        pp(t,""+m.name+"["+Object.keys(m.args).map(pp_term).join(', ')+"] = stack["+m.index+"]")
+        pp(t,`${m.name}[${m.args.map((t:Term)=>pp_term(t)).join(', ')}] = stack[${m.index}]`)
       );
       pp(t,"> Fire rule `"+dtree.rule.name+"`: "+pp_term(dtree.rule.rhs));
-    } else {
-      fail("PPDTree","Unexpected constructor in dtree: "+dtree.c);
     }
     pp(t,"Default:");
     pp_dtree(dtree.def, t+1);
   }
   
   for (let i = 0; i < dtrees.length; i++) {
-    res+="Case "+i+":\n";
-    if (dtrees[i]) { pp_dtree(dtrees[i].tree,1); }
+    res += `Case ${i}:\n`;
+    const dt = dtrees[i];
+    if (dt) { pp_dtree(dt, 1); }
     else { res += "  not computed yet...\n"; }
   }
   return res;

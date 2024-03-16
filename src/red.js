@@ -1,6 +1,4 @@
 
-var logdepth=0;
-
 function filter_rules(rules,arity) {
   const res = [];
   let max = -1;
@@ -424,8 +422,9 @@ class Context {
 
 
 class ReductionEngine {
-  red = new Map();
-  constructor() {}
+  constructor() {
+    this.red = new Map();
+  }
 
   // Get info about a symbol (adds a new entry if needed)
   get(name) {
@@ -463,7 +462,7 @@ class ReductionEngine {
   declare_injective(name) { this.get(name).injective=true; }
   declare_constant(name) {
     if (this.get(name).rules.length > 0) {
-      fail("ConstantDecl","The symbol `"+name+"` is not constant.");
+      fail("ConstantDecl", `The symbol [${name}] is not constant.`);
     }
     this.declare_injective(name);
   }
@@ -547,7 +546,7 @@ class ReductionEngine {
         state.compress();
         return state;
       }
-      while (state.head.c == "App") {
+      while (state.head.c === "App") {
         // Push the state version of the argument on the stack
         state.stack.push( new State(state.head.argm, state.ctxt) );
         state.head = state.head.func;
@@ -599,18 +598,11 @@ class ReductionEngine {
     // Truncate to keep only the first [arity] arguments from the top of the stack
     const truncated_stack = state.stack.slice(state.stack.length-dtree.arity);
     // Running the decision tree with the given args (in order)
-    //console.log(" ".repeat(logdepth)+"Rewriting: "+pp_term(state.to_term()) );
-    //logdepth += 1;
     let [rule, meta_subst] = this.exec_dtree(dtree.tree,truncated_stack);
-    //logdepth -= 1;
-    if (!rule) {
-      //console.log(" ".repeat(logdepth)+"NoRew");
-      return null;
-    }
+    if (!rule) { return null; }
     state.head = rule.rhs;
     state.stack = state.stack.slice(0,state.stack.length-rule.stack.length);
     state.ctxt = new Context(meta_subst);
-    //console.log( " ".repeat(logdepth)+"RW:"+rule.name+" > "+pp_term(state.to_term()) );
     return rule.name;
   }
 
@@ -643,7 +635,6 @@ class ReductionEngine {
       }
     } else if (dtree.c === 'Test') {
       const subst = new Map();
-      //console.log("Test: " + dtree.rule.name);
       for (let i = 0; i < dtree.match.length; i++) {
         const m = dtree.match[i];
         let matched = stack[m.index];
