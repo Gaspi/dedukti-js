@@ -44,7 +44,7 @@ function app(func: Term, args: Term[]) { return args.reduce(App, func); }
 
 // A pattern is a term extended with (potentially anonymous) meta-variables
 // A "joker" is an anonym fully applied meta-variable. A default name and the full list of args are assigned at scoping.
-function MVar(name: string | null = null, args: Term[] = []): Term { return { c: 'MVar', name, args, joker: false }; }
+function MVar(name: string | number | null = null, args: Term[] = []): Term { return { c: 'MVar', name, args, joker: false }; }
 function Joker(): Term { return { c: 'MVar', joker: true }; }
 
 // Returns the head of a term together with the list of its arguments *in reverse order*
@@ -64,9 +64,11 @@ function PreRef(name: string) { return { c: 'PreRef', name }; }
 // Instructions
 type Instruction = {
   readonly c: string;
+  readonly ln: number;
   [key: string]: any;
 }
-type Rule = { name:string, lhs:Term, rhs:Term };
+
+type Rule = { name:string, lhs:Term, rhs:Term, check:boolean };
 
 
 function Decl(ln: number, name: string, params: [string, Term][], type: Term, def: Term, dtype: string): Instruction {

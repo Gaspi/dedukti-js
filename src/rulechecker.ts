@@ -1,14 +1,14 @@
 
 // Returns [term] where each free variables instance x#0 in turned into a meta-variable
 // whose name !3 corresponds to its DeBruijn *level*. (assuming ctx_size=4 in the example)
-function vars_to_meta(term, ctx_size, depth=0) {
-  function s(t,d) {
+function vars_to_meta(term:Term, ctx_size:number, depth=0) : Term {
+  function s(t:Term, d:number) : Term {
     switch (t.c) {
       case "Var" : return t.index < d ? t: MVar('!'+(ctx_size - 1 - t.index + d));
       case "All" : return All(t.name, s(t.dom,d) , s(t.cod,d+1) );
       case "Lam" : return Lam(t.name, t.type && s(t.type,d) , s(t.body,d+1) );
       case "App" : return App( s(t.func,d) , s(t.argm,d) );
-      case "MVar": return MVar(t.name, t.args.map((t)=>s(t,d)) );
+      case "MVar": return MVar(t.name, t.args.map( (t:Term) => s(t,d) ) );
       default: return t;
     }
   }
@@ -17,13 +17,13 @@ function vars_to_meta(term, ctx_size, depth=0) {
 
 
 /** For all [args] = [t_0, ..., t_n]
-    Returns the substitution { t_i : MVar(i) | t_i is a variable below depth [depth] }
+    Returns the substitution { t_i : i | t_i is a variable below depth [depth] }
 */
-function get_partial_meta_match(args, depth) {
-  const res = {};
+function get_partial_meta_match(args:Term[], depth:number) : { [k:number] : number } {
+  const res : { [key: number] : number } = {};
   args.forEach( function(a,i) {
     if (a.c === 'Var' && a.index < depth) {
-      res[a.index] = MVar(i);
+      res[a.index] = i;
     }
   });
   return res;
@@ -42,9 +42,9 @@ function get_partial_meta_match(args, depth) {
       This would be used to perform to the matching of the term
       again some pattern X[ z[2], y[0] ]
 */
-function meta_match(term, map, arity, depth) {
+function meta_match(term:Term, map:{ [k:number] : number }, arity:number, depth:number) : Term {
   if (depth == 0) { return term; }
-  function mm(t,d) {
+  function mm(t:Term, d:number) : Term {
     switch (t.c) {
       case "Var":
         if (t.index < d) { return t; }
@@ -58,7 +58,7 @@ function meta_match(term, map, arity, depth) {
       case "All" : return All(t.name, mm(t.dom,d), mm(t.cod,d+1));
       case "Lam" : return Lam(t.name, t.type && mm(t.type,d) , mm(t.body,d+1) );
       case "App" : return App( mm(t.func,d) , mm(t.argm,d) );
-      case "MVar": return MVar(t.name, t.args.map( (t)=>mm(t,d) ));
+      case "MVar": return MVar(t.name, t.args.map( (t:Term) => mm(t,d) ));
       default: return t;
     }
   }
@@ -67,7 +67,7 @@ function meta_match(term, map, arity, depth) {
 
 /** Checks whether the given term is a non-pattern meta-variable instance.
 */
-function is_non_pattern_instance(term) {
+function is_non_pattern_instance(term:Term) {
   // Applied meta-variable are offending
   if (term.c === 'App') {
     return term.func.c === 'MVar';
@@ -78,7 +78,7 @@ function is_non_pattern_instance(term) {
   if (term.c === 'MVar') {
     // We collect the DB index of all arguments that are variables
     const bag = new Set();
-    term.args.forEach(a => bag.add(a.c==="Var" ? a.index : null));
+    term.args.forEach( (a:Term) => bag.add(a.c==="Var" ? a.index : null));
     return bag.has(null) || bag.size < term.args.length;
   }
   return false;
@@ -90,38 +90,35 @@ function is_non_pattern_instance(term) {
  * Relies on a map associating each meta-variable name
  * to (an array of memoised shifted) term(s) with which to substitute.
  */
-function meta_map_subst(term, subst, depth=0, to_term=(t)=>t) {
+function meta_map_subst(term:Term, subst : Map<string,Term>, depth=0) : Term {
   // Shift memoisation : maps metavar name to multiple shifted values
   let ct = 0; // Compteur de substitutions
-  const map = new Map();
-  subst.forEach((v,k)=>map.set(k,[]));
-  function ms(t,d) {
+  const map : Map<string,Term[]> = new Map();
+  subst.forEach((v,k)=>map.set(k,[v]));
+  function ms(t:Term, d:number) {
     const cta = ct;
     if (t.c === "MVar") {
-      const args = t.args.map((t)=>ms(t,d));
+      const args = t.args.map((t:Term)=>ms(t,d));
       const shifts = map.get(t.name);
       if (!shifts) { return (ct === cta ? t : MVar(t.name,args)); }
       ct += 1; // Substitution effectuée
       if ( !(shifts instanceof Array) ) {
         return meta_map_subst(shifts, args);
       } else if (!shifts[d]) {
-        if (shifts.length == 0) {
-          shifts[0] = to_term(subst.get(t.name));
-        }
         shifts[d] = shift(shifts[0], d);
       }
       return meta_map_subst(shifts[d], args);
     } else if (t.c === "All") {
-      const dom = ms(t.dom, d  );
-      const cod = ms(t.cod, d+1);
+      const dom : Term = ms(t.dom, d  );
+      const cod : Term= ms(t.cod, d+1);
       return (ct === cta && t) || All(t.name, dom, cod);
     } else if (t.c === "Lam") {
-      const type = t.type && ms(t.type, d  );
-      const body =           ms(t.body, d+1);
+      const type : Term= t.type && ms(t.type, d  );
+      const body : Term=           ms(t.body, d+1);
       return (ct === cta && t) || Lam(t.name,type,body);
     } else if (t.c === "App") {
-      const func = ms(t.func,d);
-      const argm = ms(t.argm,d);
+      const func : Term= ms(t.func,d);
+      const argm : Term= ms(t.argm,d);
       return (ct === cta && t) || App(func,argm);
     } else {
       return t;
@@ -130,32 +127,40 @@ function meta_map_subst(term, subst, depth=0, to_term=(t)=>t) {
   return ms(term,depth);
 }
 
+type TypeAssumption =  {
+  name : string,
+  ctx  : Term[],
+  args : string[],
+  type : Term
+}
+
 // Typing and convertion assumptions mechanisms
 class AssumptionSet {
-  constructor(red) {
-    this.red = red;
-    this.assumed_types = [];
-    this.assumed_conv = [];
-    // Progressively build a variable substitution
-    this.subst = new Map();
-  }
+  red: ReductionEngine;
+  assumed_types : TypeAssumption[] = [];
+  assumed_conv : [Term,Term][] = [];
+  // Progressively build a variable substitution
+  subst : Map<any,any> = new Map();
 
-  is_injective(t) {
+  constructor(red: ReductionEngine) { this.red = red; }
+
+  is_injective(t:Term) {
     return t.c==='Var' || (t.c==='Ref' && this.red.is_injective(t.name));
   }
   
-  equals(u, v) {
+  equals(u:Term, v:Term) {
     return equals(u, v) ||
-      this.assumed_conv.some(function ([a,b]) {
+      this.assumed_conv.some(function ([a,b]:[Term,Term]) {
         return (equals(a, u) && equals(b, v)) || (equals(a, v) && equals(b, u));
       });
   }
   
   // Check wether the terms can be decided convertible using the given assumptions
-  are_convertible(u, v) {
-    const acc = [ [ this.msubst(u), this.msubst(v)] ];
-    while (acc.length > 0) {
-      const [a,b] = acc.pop();
+  are_convertible(u:Term, v:Term) {
+    const acc :[Term,Term][] = [ [ this.msubst(u), this.msubst(v)] ];
+    let top;
+    while (top = acc.pop()) {
+      const [a,b] = top;
       //console.log("Conv:",pp_term(a),"<<-?->>",pp_term(b));
       if (!this.equals(a,b)) {
         const whnf_a = this.red.whnf(a);
@@ -171,28 +176,27 @@ class AssumptionSet {
     return true;
   }
 
-  msubst(t) { return meta_map_subst(t, this.subst); }
+  msubst(t:Term) : Term { return meta_map_subst(t, this.subst); }
 
   // Check where the terms can be decided convertible using the given assumptions
   // And assuming meta-variable !j for j < i can be substituted (in the LHS only)
   // The meta-substitution S is updated with the required substitutions
   // if [i] is omitted : all variables !j can be substituted
-  are_convertible_unify(u, v, S, i) {
+  are_convertible_unify(u:Term, v:Term, S:Map<string,Term>, i?:number) {
     // Stack of required conversion check together with their depth (used for unifications)
-    const acc = [ [this.msubst(u),this.msubst(v), 0] ];
-    while (acc.length > 0) {
-      const [a,b,d] = acc.pop();
+    const acc : [Term, Term, number][] = [ [this.msubst(u), this.msubst(v), 0] ];
+    let top;
+    while (top = acc.pop()) {
+      const [a,b,d] = top;
       //console.log("ConvU:",pp_term(a),"<<-?->>",pp_term(b));
       if (equals(a,b)) { continue; }
       const whnfa = this.red.whnf(a);
-      if (whnfa.c==='MVar' &&
-          whnfa.name[0]==='!' &&
-          /^[0-9]+$/.test(whnfa.name.substring(1))) {
+      if (whnfa.c==='MVar' && /^![0-9]+$/.test(whnfa.name)) {
         const index = parseInt(whnfa.name.substring(1));
-        if (index >= i) { fail('ConvCheck RHS','This should not happen'); }
-        const match = meta_match(b, get_partial_meta_match(whnfa.args, d), d);
+        if (i !== undefined && index >= i) { fail('ConvCheck RHS','This should not happen'); }
+        const match = meta_match(b, get_partial_meta_match(whnfa.args, d), whnfa.args.length, d);
         // Extend the substitution S
-        S.set('!'+index, match);
+        S.set(whnfa.name, match);
         // Apply the extended S to the LHS of the remaining conversion checks
         acc.forEach(function(c) { c[0] = meta_map_subst(c[0],S); });
         continue;
@@ -203,12 +207,10 @@ class AssumptionSet {
   }
 
   // Find a WHNF using the assumptions to substitute meta-variables
-  whnf(term) {
-    return this.red.whnf( this.msubst(term) );
-  }
+  whnf(term:Term) : Term { return this.red.whnf( this.msubst(term) ); }
 
   // Extend the substitution with {x => t}
-  extend_subst(x,t) {
+  extend_subst(x:string, t:Term) {
     // apply current meta-substitution to b
     const val = this.msubst(t);
     // Build the meta-subst {X => b}
@@ -221,11 +223,11 @@ class AssumptionSet {
     const prev_assumptions = this.assumed_conv;
     this.assumed_conv = [];
     // Re-assume them, substituted with {X => b} to both sides
-    prev_assumptions.forEach( ([a,b]) => this.assume_convertible(this.whnf(a),this.whnf(b)));
+    prev_assumptions.forEach( ([a,b]:[Term,Term]) => this.assume_convertible(this.whnf(a),this.whnf(b)));
   }
 
   // Assume a new convertibility a == b
-  assume_conv(a,b) {
+  assume_conv(a:Term, b:Term) {
     if (a.c==='MVar' && !this.subst.has(a.name)) {
       // If a is a new meta-var, then extend the substitution
       this.extend_subst(a.name,b);
@@ -238,13 +240,14 @@ class AssumptionSet {
 
 
   // Record an assumed convertibility between two terms
-  assume_convertible(t1, t2) {
+  assume_convertible(t1:Term, t2:Term) {
     const acc = [[t1,t2]];
     // We record information from this assumed conversion
     // and only return a false-value if the given terms can never be convertible
     // (warn the user that something is off...)
-    while (acc.length > 0) {
-      const [u,v] = acc.pop();
+    let top;
+    while (top = acc.pop()) {
+      const [u,v] = top;
       if (equals(u,v)) { continue; }
       const a = this.whnf(u);
       const b = this.whnf(v);
@@ -274,16 +277,17 @@ class AssumptionSet {
     }
   }
 
+  
   // Record a new type assumption
-  assume_mvar_type(term, expected_type, ctx) {
-    const acc = [];
+  assume_mvar_type(term:Term, expected_type:Term, ctx:Ctxt) {
+    const acc : Term[] = [];
     while (ctx) { acc.push(ctx.head[1]); ctx = ctx.tail; }
     acc.reverse();
     this.assumed_types.push(
       {
         name : term.name,
         ctx  : acc.map((x,i)=> vars_to_meta(x,i)),
-        args : term.args.map(t=>'!'+(acc.length-t.index-1)),
+        args : term.args.map( (t:Term) =>'!'+(acc.length-t.index-1)),
         type : vars_to_meta(expected_type,acc.length),
       });
   }
@@ -300,11 +304,12 @@ class AssumptionSet {
   }
 }
 
-
 // Rule checking entry point
 class RuleChecker {
+  red : ReductionEngine;
+  env : Environment;
 
-  constructor(env,red) {
+  constructor(env:Environment, red:ReductionEngine) {
     this.env = env;
     this.red = red;
   }
@@ -318,7 +323,7 @@ class RuleChecker {
   // for some substitution S of the locally bound variables
   // If [expected_type] is provided then the inferred type is checked to be unifiable with it
   // for some extension of S
-  rhs_infer_mvar_type(assumptions, term, ctx, expected_type) {
+  rhs_infer_mvar_type(assumptions:AssumptionSet, term:Term, ctx:Ctxt, expected_type?:Term) {
     //console.log("RHS Infer MVar: Inferring the type of meta-variable instance `" + pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
     for (let k = 0; k < assumptions.assumed_types.length; k++) {
       const assumption = assumptions.assumed_types[k];
@@ -343,8 +348,8 @@ class RuleChecker {
       // Build assumption.type substituted with S and with the variable substitution (with substitute shifted)
       // Unshift it to ensure contains no remaining variable and return it
       try {
-        const unchecked = Array(ctx_size).fill(true);
-        function aux(self) {
+        const unchecked : boolean[] = Array(ctx_size).fill(true);
+        function aux(self:RuleChecker) {
           // Find the first unchecked variable that is mapped to something in S
           const i = unchecked.findIndex((t,i)=>t && S.has('!'+i));
           if (i < 0) { return true; } // if there are none, then the work is done: proceed
@@ -358,12 +363,12 @@ class RuleChecker {
         }
         while (!aux(this)) {}
         const inf_final_type = meta_map_subst(assumption.type, S);
-        if (!expected_type) { // Infer mode
+        if (expected_type === undefined) { // Infer mode
           return inf_final_type;
         } else { // Check mode
           // If we need to check a type for the result, then unify the inferred one
           // allowing for even further extension of S
-          if (!assumptions.are_convertible_unify(inf_final_type,expected_type,S)) { fail(); }
+          if (!assumptions.are_convertible_unify(inf_final_type, expected_type, S)) { throw("[rhs_infer_mvar_type] This should not escape"); }
           // check that the extension of S is still ok (might require even further extension of S)
           while (!aux(this)) {}
           return; // The check is successful, return
@@ -380,7 +385,7 @@ class RuleChecker {
   //////////////////////////////////////////////////////////////
 
   // Infers the type of a term
-  lhs_infer(assumptions, term, ctx = Ctx()) {
+  lhs_infer(assumptions:AssumptionSet, term:Term, ctx:Ctxt = null) {
     //console.log("LHS Infer",pp_term(term,ctx));
     switch (term.c) {
       case "Knd": fail("LHS Infer","Cannot infer the type of Kind !");
@@ -433,7 +438,7 @@ class RuleChecker {
   }
 
   // Checks if a term has given expected type
-  lhs_check(assumptions, term, expected_type, ctx = Ctx()) {
+  lhs_check(assumptions:AssumptionSet, term:Term, expected_type:Term, ctx:Ctxt = Ctx()) {
     //console.log("LHS Check "+pp_term(term,ctx)+" has type "+pp_term(expected_type,ctx));
     if (term.c === 'MVar') {
       assumptions.assume_mvar_type(term, expected_type, ctx);
@@ -456,7 +461,7 @@ class RuleChecker {
 
   // Infers the type of a RHS meta-term assuming the given assumptions
   // (that were inferred from typing the LHS)
-  rhs_infer(assumptions, term, ctx=Ctx()) {
+  rhs_infer(assumptions:AssumptionSet, term:Term, ctx=Ctx()) {
     //console.log("RHS Infer",term.c,term,pp_term(term,ctx));
     switch (term.c) {
       case "Knd": fail("RHS Infer","Cannot infer the type of Kind !");
@@ -508,7 +513,7 @@ class RuleChecker {
 
   // Check the type of a RHS meta-term assuming the given assumptions
   // (that were inferred from typing the LHS)
-  rhs_check(assumptions, term, expected_type, ctx=Ctx()) {
+  rhs_check(assumptions:AssumptionSet, term:Term, expected_type:Term, ctx=Ctx()) {
     //console.log("CheckWithAssumption",pp_term(term,ctx), pp_term(expected_type,ctx));
     const type = assumptions.whnf(expected_type);
     if (type.c === "All" && term.c === "Lam") {
@@ -544,7 +549,7 @@ class RuleChecker {
 
   // Infers the type of a RHS meta-term assuming the given assumptions
   // (that were inferred from typing the LHS)
-  rhs_infer_unify(assumptions, term, ctx, S, i) {
+  rhs_infer_unify(assumptions:AssumptionSet, term:Term, ctx:Ctxt, S:Map<string,Term>, i:number) {
     //console.log("RHS Infer Unify",term.c,term,pp_term(term,ctx));
     switch (term.c) {
       case "Knd": fail("RHS Infer Unify","Cannot infer the type of Kind !");
@@ -597,7 +602,7 @@ class RuleChecker {
   // Check the type of a RHS meta-term assuming the given assumptions
   // (that were inferred from typing the LHS)
   // Allows to perform unification in S
-  rhs_check_unify(assumptions, term, expected_type, ctx, S, i) {
+  rhs_check_unify(assumptions:AssumptionSet, term:Term, expected_type:Term, ctx:Ctxt, S:Map<string,Term>, i:number) {
     //console.log("CheckWithAssumption",pp_term(term,ctx), pp_term(expected_type,ctx));
     const type = assumptions.whnf(expected_type);
     if (type.c === "All" && term.c === "Lam") {
@@ -628,7 +633,7 @@ class RuleChecker {
   ////////////////////       Rule  Checking  ///////////////////
   //////////////////////////////////////////////////////////////
 
-  check_rule_well_formed(rule) {
+  check_rule_well_formed(rule:ExRule) {
     if (!is_closed(rule.lhs)) { fail("Rule","LHS must be a closed term."); }
     if (!is_closed(rule.rhs)) { fail("Rule","RHS must be a closed term."); }
     // A pattern is ill-formed if a subterm is a non-pattern or applied meta-variable instance
@@ -639,11 +644,12 @@ class RuleChecker {
     }
     // A pattern is ill-formed if a meta-variable occurs with distinct arities
     const arities = new Map();
-    const check_mvar = function(t) {
+    const check_mvar = function(t:Term) : boolean {
       if(t.c === 'MVar') {
         if (arities.has(t.name) && arities.get(t.name)!==t.args.length) { return true; }
         arities.set(t.name, t.args.length);
       }
+      return false;
     }
     const wrong_arity_instance = find_subterm(check_mvar, rule.lhs) || find_subterm(check_mvar, rule.rhs);
     if (wrong_arity_instance) {
@@ -652,7 +658,7 @@ class RuleChecker {
     }
   }
 
-  check_rule_type_preservation(rule) {
+  check_rule_type_preservation(rule:ExRule) {
     if (!rule.check) { return; }
     const assumptions = new AssumptionSet(this.red);
     const inferred_type = this.lhs_infer(assumptions, rule.lhs);
@@ -660,7 +666,7 @@ class RuleChecker {
   }
 
   // Checks type preservation and add a new rule to the reduction machine
-  declare_rule(rule) {
+  declare_rule(rule:ExRule) {
     const [hd,tl] = get_head(rule.lhs);
     if (hd.c!=="Ref") { fail("Rule","LHS must be headed by a symbol."); }
     const smb = this.env.get(hd.name);

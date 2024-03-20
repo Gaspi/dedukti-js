@@ -1,11 +1,10 @@
-class Queue {
-  constructor() {
-    this.items = {};
-    this.headIndex = 0;
-    this.tailIndex = 0;
-  }
+class Queue<T> {
+  items : { [key:number]: T } = {};
+  headIndex = 0;
+  tailIndex = 0;
+  constructor() {}
 
-  enqueue(item) {
+  enqueue(item:T) {
     this.items[this.tailIndex] = item;
     this.tailIndex++;
   }
@@ -18,18 +17,18 @@ class Queue {
     return item;
   }
 
-  peek() {
+  peek() : T {
     this.#validate() // validate if not empty
     return this.items[this.headIndex];
   }
 
-  #validate() { // validation logic
+  #validate() : void { // validation logic
     if (this.headIndex === this.tailIndex) { 
       throw new Error('Cannot perform operation on an empty queue')
     }
   }
 
-  get length() {
+  get length() : number {
     return this.tailIndex - this.headIndex;
   }
 }

@@ -1,4 +1,3 @@
-
 function fail(title:string, msg:string, ln?:number): never { throw {title,msg,ln}; }
 
 // Togglable debug module

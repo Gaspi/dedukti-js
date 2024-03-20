@@ -110,11 +110,11 @@ class Environment {
         return Ref(this.do_get(namespace+(namespace&&".")+e.name).fullname);
       case "All":
         e.dom = this.scope(e.dom, ctx, namespace);
-        e.cod = this.scope(e.cod, extend(ctx, [e.name,null]), namespace);
+        e.cod = this.scope(e.cod, extend(ctx, [e.name,Joker()]), namespace);
         break;
       case "Lam":
         e.type = this.scope(e.type, ctx, namespace);
-        e.body = this.scope(e.body, extend(ctx, [e.name,null]), namespace);
+        e.body = this.scope(e.body, extend(ctx, [e.name,Joker()]), namespace);
         break;
       case "App":
         e.func = this.scope(e.func, ctx, namespace);

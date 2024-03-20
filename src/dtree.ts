@@ -6,7 +6,7 @@
 
 type ExRule = Rule &  { head:Term, stack:any[] };
 
-type RuleRow = { rule:Rule, cols:Term[]}
+type RuleRow = { rule:ExRule, cols:Term[]}
 type RuleMatrix = { rows: RuleRow[], depths: number[] }
 
 type DTreeTest = {
@@ -14,7 +14,7 @@ type DTreeTest = {
   name:string,
   subst:number[],
   depth:number,
-  args: Term[],
+  args: number[],
   joker_match: boolean
 }
 
@@ -28,7 +28,7 @@ type DTreeNode = {
 } | {
   c:'Test',
   match:DTreeTest[],
-  rule:Rule,
+  rule:ExRule,
   def:DTreeNode
 } | null
 type DTree = {
@@ -217,7 +217,7 @@ function pp_dtrees(dtrees: DTreeNode[]) {
     } else if (dtree.c === 'Test') {
       pp(t,"Match:");
       dtree.match.forEach((m)=>
-        pp(t,`${m.name}[${m.args.map((t:Term)=>pp_term(t)).join(', ')}] = stack[${m.index}]`)
+        pp(t,`${m.name}[${m.args.map((i)=>pp_term(Var(i))).join(', ')}] = stack[${m.index}]`)
       );
       pp(t,"> Fire rule `"+dtree.rule.name+"`: "+pp_term(dtree.rule.rhs));
     }

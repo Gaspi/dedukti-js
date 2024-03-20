@@ -25,10 +25,10 @@ function pp_term(term:Term, ctx = Ctx()) : string {
       return pp_term(term,ctx)+" "+text;
     case "All":
       let dom = (term.name ? "("+term.name+" : "+pp_term(term.dom,ctx)+")" : pp_term_wp(term.dom,ctx));
-      let cod = pp_term(term.cod,extend(ctx, [term.name, null]));
+      let cod = pp_term(term.cod,extend(ctx, [term.name, Joker()]));
       return dom+" -> "+cod;
     case "Lam":
-      let body = pp_term(term.body, extend(ctx, [term.name, null]));
+      let body = pp_term(term.body, extend(ctx, [term.name, Joker()]));
       return "(" + (term.type ? "("+term.name+" : "+pp_term(term.type,ctx)+")" : term.name) + " => "+body+")";
     case "Knd": case "Typ": case "Var": case "PreScope": case "Ref": case "MVar":
       return pp_term_wp(term, ctx);

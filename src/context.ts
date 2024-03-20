@@ -1,12 +1,12 @@
 // A context is a list of [name, type] pairs
 type Ctxt = {
-  head: [string, Term|null];
+  head: [string, Term];
   tail: Ctxt;
 } | null;
 
 // A context is a list of [name, type] pairs
-function Ctx():Ctxt { return null; }
-function extend(ctx:Ctxt, bind:[string,Term|null]):Ctxt { return {head: bind, tail: ctx}; }
+function Ctx():Ctxt  { return null; }
+function extend(ctx:Ctxt, bind:[string,Term]):Ctxt { return {head: bind, tail: ctx}; }
 
 function ctx_size(ctx:Ctxt,acc=0):number { return ctx == null ? acc : ctx_size(ctx.tail,acc+1); }
 
