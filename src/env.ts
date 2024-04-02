@@ -1,6 +1,5 @@
-
 type SmbDecl = { fullname:string, proof:boolean; proven:boolean; type:Term };
-type EnvMap = Map<any, any>;
+type EnvMap = Map<string, any>;
 
 class Environment {
   env:EnvMap = new Map();
@@ -77,61 +76,58 @@ class Environment {
     if (ins.term) { ins.term = this.scope(ins.term, ins.ctx, namespace); }
     if (ins.type) { ins.type = this.scope(ins.type, ins.ctx, namespace); }
     if (ins.def ) { ins.def  = this.scope(ins.def , ins.ctx, namespace); }
-    if (ins.lhs ) { ins.lhs  = this.scope(ins.lhs , ins.ctx, namespace); }
+    if (ins.lhs ) { ins.lhs  = this.scope(ins.lhs , ins.ctx, namespace, ins.c==='Rew'); }
     if (ins.rhs ) { ins.rhs  = this.scope(ins.rhs , ins.ctx, namespace); }
     if (namespace) {
       if (ins.name ) { ins.name   = `${namespace}.${ins.name}` ; }
       if (ins.alias) { ins.alias  = `${namespace}.${ins.alias}`; }
     }
   }
-  
+
   // Scoping of context, potentially in place.
-  scope_ctx(ctx:[string, Term][], namespace='') {
+  scope_ctx(ctx:[string, Term][], namespace='') : Ctxt {
     let res = Ctx();
     for (let i = 0; i < ctx.length; i++) {
       res = extend(res, [ ctx[i][0], this.scope(ctx[i][1],res,namespace)]);
     }
     return res;
   }
-  // Scoping of (meta-)terms and instructions, potentially in place.
-  scope(e:Term, ctx=Ctx(), namespace='') {
-    if (!e) { return e; }
-    switch (e.c) {
-      // Variable, meta-variable or symbol to scope
-      case "PreScope":
-        const ind = index_of(ctx,e.name);
-        if (ind != null) { return Var(ind, e.name); }
-        const s = this.get(namespace+(namespace&&".")+e.name);
-        if (s) { return Ref(s.fullname); }
-        return MVar(e.name,[]);
-      // (Meta-)term constructors
-        break;
-      case "PreRef": // Previously defined or loaded reference to locate in the environment
-        return Ref(this.do_get(namespace+(namespace&&".")+e.name).fullname);
-      case "All":
-        e.dom = this.scope(e.dom, ctx, namespace);
-        e.cod = this.scope(e.cod, extend(ctx, [e.name,Joker()]), namespace);
-        break;
-      case "Lam":
-        e.type = this.scope(e.type, ctx, namespace);
-        e.body = this.scope(e.body, extend(ctx, [e.name,Joker()]), namespace);
-        break;
-      case "App":
-        e.func = this.scope(e.func, ctx, namespace);
-        e.argm = this.scope(e.argm, ctx, namespace);
-        break;
-      case "MVar":
-        if (e.joker) {
-          e.name = this.fresh_name();
-          e.args = [...Array( ctx_size(ctx) ).keys()].map((i)=>Var(i));
-        } else {
+  // Scoping of (meta-)terms potentially in place.
+  scope(term:PreTerm, context=Ctx(), namespace='', lhs=false) : Term {
+    const self = this;
+    function s(e:PreTerm, ctx:CtxtT<null>) : Term {
+      switch (e.c) {
+        // Variable, meta-variable or symbol to scope
+        case "PreScope":
+          const ind = index_of(ctx,e.name);
+          if (ind != null) { return Var(ind, e.name); }
+          const ns = self.get(namespace+(namespace&&".")+e.name);
+          return ns ? Ref(ns.fullname) : MVar(e.name,[]);
+        // (Meta-)term constructors
+        case "PreRef": // Previously defined or loaded reference to locate in the environment
+          return Ref(self.do_get(namespace+(namespace&&".")+e.name).fullname);
+        case "All":
+          e.dom = s(e.dom, ctx);
+          e.cod = s(e.cod, extend(ctx, [e.name,null]));
+          break;
+        case "Lam":
+          e.type = e.type.c === 'Jok' ? e.type : s(e.type, ctx);
+          e.body = s(e.body, extend(ctx, [e.name,null]));
+          break;
+        case "App":
+          e.func = s(e.func, ctx);
+          e.argm = s(e.argm, ctx);
+          break;
+        case "Jok":
+          return lhs ? MVar( self.fresh_name() , [...Array( ctx_size(ctx) ).keys()].map((i)=>Var(i))) : e;
+        case "MVar":
           for (let i = 0; i < e.args.length; i++) {
-            e.args[i] = this.scope(e.args[i],ctx, namespace);
+            e.args[i] = s(e.args[i],ctx);
           }
-        }
-        break;
+      }
+      return (e as Term);
     }
-    return e;
+    return s(term, context);
   }
-  
+
 }

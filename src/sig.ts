@@ -1,6 +1,12 @@
+type Message = { status:'ok'|'info'|'warn', title:string, msg:string, ins?: Instruction[] };
 
 class Signature {
-  
+  start_time: Date;
+  time: Date;
+  env: Environment;
+  red: ReductionEngine;
+  rulechecker: RuleChecker;
+
   constructor(env = new Environment(), red = new ReductionEngine()) {
     this.start_time=new Date();
     this.time=this.start_time;
@@ -10,7 +16,7 @@ class Signature {
   }
   
   // Infers the type of a term
-  infer(term, ctx=Ctx()) {
+  infer(term: Term, ctx=Ctx()) : Term {
     // console.log("Infer",term.c,term,pp_term(term,ctx));
     switch (term.c) {
       case "Knd": fail("Infer","Cannot infer the type of Kind !");
@@ -52,15 +58,15 @@ class Signature {
   }
   
   // Checks if a term has given expected type
-  check(term, expected_type, ctx=Ctx()) {
+  check(term: Term, expected_type: Term, ctx : Ctxt = Ctx()) : void {
     // console.log("Check",term.c,term, pp_term(term,ctx));
     if (term.c === 'MVar') { fail("Check", "Cannot check the type of a meta-variable instance: "+pp_term(term, ctx)); }
     const type = this.red.whnf(expected_type);
     if (type.c === "All" && term.c === "Lam") {
-      if (term.type.joker) {
+      if (term.type.c === 'Jok') {
         term.type = type.dom;
       } else if (!this.red.are_convertible(term.type, type.dom)) {
-        fail("Check", "Incompatible annotation `"+pp_term(term, ctx)+"`."+
+        fail("Check", `Incompatible annotation [${pp_term(term, ctx)}].\n`+
           "- Expect = " + pp_term(type.dom, ctx)+"\n"+
           "- Actual = " + pp_term(term.type, ctx)+"\n"+
           pp_context(ctx));
@@ -79,16 +85,16 @@ class Signature {
   }
   
   // Checks declared type and adds a new symbol to the environment
-  declare_symbol(ins) {
+  declare_symbol(ins : Instruction) : void {
     const sort = this.red.whnf( this.infer(ins.type) );
     if (sort.c !== "Typ" && sort.c !== "Knd") {
       fail("Declaration","Declared type is not a sort.: `" + pp_term(ins.type) + "`.");
     }
     this.env.add_new_symbol(ins.name, ins.type, ins.c==="Thm");
   }
-  
+
   // Process a single unscoped instruction
-  *check_instruction(ins, load=null, namespace="", ins_stack = []) {
+  *check_instruction(ins : Instruction, load : ((mod:string)=>Instruction[]) | null = null, namespace:string="", ins_stack : Instruction[] = []) : Generator<Message> {
     try {
       this.env.scope_instruction(ins, namespace);
       switch (ins.c) {
@@ -122,16 +128,15 @@ class Signature {
           yield { status:'ok', title:"Symbol declared injective", msg:`\`${ins.name}\` (no check)`};
           break;
         case "Rew":
-          this.rulechecker.declare_rule(ins);
+          this.rulechecker.declare_rule(ins as Rule);
           if (ins.lhs.c==='Ref' && this.env.get(ins.lhs.name).proven) {
             yield { status:'ok', title:"Theorem proven", msg:`\`${ins.lhs.name}\``};
-            log('ok',ins.ln,"Theorem proven",'`'+ins.lhs.name+'`');
           } else {
             yield { status:'ok', title:"Rewrite rule added", msg:`${pp_term(ins.lhs)} --> ${pp_term(ins.rhs)}`};
           }
           break;
         case "Eval":
-          yield { status:'info', title:"Eval", msg:pp_term(this.red.nf(ins.term, ins.ctx), ins.ctx)+"\n"+pp_context(ins.ctx) };
+          yield { status:'info', title:"Eval", msg:pp_term(this.red.nf(ins.term), ins.ctx)+"\n"+pp_context(ins.ctx) };
           break;
         case "Infer":
           yield { status:'info', title:"Infer", msg:pp_term(this.infer(ins.term, ins.ctx), ins.ctx)+"\n"+pp_context(ins.ctx) };
@@ -187,14 +192,14 @@ class Signature {
           fail("Instruction","Unexpected instruction constructor:"+ins.c);
       }
     //*
-    } catch(e) {
+    } catch(e : any) {
       e.ln = ins.ln;
       throw e;
     }
     //*/
   }
   
-  *check_instructions(instructions, load=null, namespace="", ins_stack = []) {
+  *check_instructions(instructions: Instruction[], load : ((mod:string)=>Instruction[]) | null=null, namespace="", ins_stack : Instruction[] = []) {
     if (!Array.isArray(instructions)) {
       fail("Instruction","Unexpected set of instructions. The checker is not used properly...");
     }

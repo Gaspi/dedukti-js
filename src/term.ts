@@ -1,20 +1,75 @@
-// A term is an ADT represented by an object in which "c" labels
-/*
-type Term =
-  { c: 'Typ'; }
-| { c: 'Knd'; }
-| { c: 'Var'; index:number; preferred_name:string|null}
-| { c: 'Ref'; name:string}
-| { c: 'All'; name:string, dom:Term, cod:Term}
-| { c: 'Lam'; name:string, type:Term, body:Term}
-| { c: 'App'; func:Term, argm:Term}
-| { c: 'MVar'; joker:true}
-| { c: 'MVar'; joker:false, name:string|null, args:Term[]};
-*/
-type Term = {
-  readonly c: string;
-  [key: string]: any;
+// A term is an ADT represented by an object in which "c" labels the type
+
+type TermVar =
+  { c: 'Var', index:number, preferred_name:string|null};
+type TermMVar =
+  { c: 'MVar', name:string|number|null, args:Term[] };
+type TermNoApp =
+  { c: 'Knd' }
+| { c: 'Typ' }
+| { c: 'All', name:string|null, dom:Term, cod:Term}
+| { c: 'Lam', name:string, type:Term, body:Term}
+| TermVar
+| { c: 'Ref', name:string}
+| TermMVar
+| { c: 'Jok' };
+// A Joker means different things depending on the context:
+// - In a LHS : it is an unnamed fully applied meta-var that doesn't occur on the RHS. [target] is an expected type
+// - In a term : it is an unknown term that is meant to be inferred (and repalced in place) at typechecking.
+type Term = TermNoApp
+| { c: 'App', func:Term, argm:Term};
+
+type PureTerm =
+  { c: 'Knd' }
+| { c: 'Typ' }
+| { c: 'All', name:string|null, dom:PureTerm, cod:PureTerm}
+| { c: 'Var', index:number, preferred_name:string|null}
+| { c: 'Ref', name:string}
+| { c: 'Lam', name:string, type:PureTerm, body:PureTerm}
+| { c: 'App', func:PureTerm, argm:PureTerm};
+
+type PreTerm =
+  { c: 'Knd' }
+| { c: 'Typ' }
+| { c: 'Var', index:number, preferred_name:string|null}
+| { c: 'MVar', name:string|number|null, args:PreTerm[] }
+| { c: 'All', name:string|null, dom:PreTerm, cod:PreTerm}
+| { c: 'Ref', name:string}
+| { c: 'Lam', name:string, type:PreTerm, body:PreTerm}
+| { c: 'App', func:PreTerm, argm:PreTerm}
+| { c: 'PreRef'; name:string}
+| { c: 'PreScope'; name:string}
+| { c: 'Jok' };
+
+// A preterm is an ADT represented by a JSON
+function PTyp(): PreTerm {
+  return { c: 'Typ' };
 }
+function PKnd(): PreTerm {
+  return { c: 'Knd' };
+}
+function PVar(index: number, preferred_name: string | null = null): PreTerm {
+  return { c: 'Var', index, preferred_name };
+}
+function PRef(name: string): PreTerm {
+  return { c: 'Ref', name };
+}
+function PAll(name: string|null, dom: PreTerm, cod: PreTerm): PreTerm {
+  return { c: 'All', name, dom, cod };
+}
+function PLam(name: string, type: PreTerm, body: PreTerm): PreTerm {
+  return { c: 'Lam', name, type, body };
+}
+function PApp(func: PreTerm, argm: PreTerm): PreTerm {
+  return { c: 'App', func, argm };
+}
+function PMVar(name: string | number | null = null, args: PreTerm[] = []): PreTerm { return { c: 'MVar', name, args }; }
+function Joker(): Term { return { c: 'Jok' }; }
+
+// Pre-scoping objects that can be either references or locally bound variables
+function PreScope(name: string) : PreTerm { return { c: 'PreScope', name }; }
+function PreRef(name: string) : PreTerm { return { c: 'PreRef', name }; }
+
 
 // A term is an ADT represented by a JSON
 function Typ(): Term {
@@ -29,7 +84,7 @@ function Var(index: number, preferred_name: string | null = null): Term {
 function Ref(name: string): Term {
   return { c: 'Ref', name };
 }
-function All(name: string, dom: Term, cod: Term): Term {
+function All(name: string|null, dom: Term, cod: Term): Term {
   return { c: 'All', name, dom, cod };
 }
 function Lam(name: string, type: Term, body: Term): Term {
@@ -41,14 +96,12 @@ function App(func: Term, argm: Term): Term {
 // Chains applications:  app(a,[b,c,d])  returns  App(App(App(a,b),c),d)
 function app(func: Term, args: Term[]) { return args.reduce(App, func); }
 
-
 // A pattern is a term extended with (potentially anonymous) meta-variables
 // A "joker" is an anonym fully applied meta-variable. A default name and the full list of args are assigned at scoping.
-function MVar(name: string | number | null = null, args: Term[] = []): Term { return { c: 'MVar', name, args, joker: false }; }
-function Joker(): Term { return { c: 'MVar', joker: true }; }
+function MVar(name: string | number | null = null, args: Term[] = []): Term { return { c: 'MVar', name, args }; }
 
 // Returns the head of a term together with the list of its arguments *in reverse order*
-function get_head(t: Term) : [Term, Term[]] {
+function get_head(t: Term) : [TermNoApp, Term[]] {
   const args = [];
   while (t.c == 'App') {
     args.push(t.argm);
@@ -57,10 +110,6 @@ function get_head(t: Term) : [Term, Term[]] {
   return [t, args];
 }
 
-// Pre-scoping objects that can be either references or locally bound variables
-function PreScope(name: string) { return { c: 'PreScope', name }; }
-function PreRef(name: string) { return { c: 'PreRef', name }; }
-
 // Instructions
 type Instruction = {
   readonly c: string;
@@ -68,10 +117,10 @@ type Instruction = {
   [key: string]: any;
 }
 
-type Rule = { name:string, lhs:Term, rhs:Term, check:boolean };
+type Rule = Instruction & { name:string, lhs:Term, rhs:Term, check:boolean };
 
 
-function Decl(ln: number, name: string, params: [string, Term][], type: Term, def: Term, dtype: string): Instruction {
+function Decl(ln: number, name: string, params: [string, Term][], type: Term|null, def ?: Term|null, dtype?: string): Instruction {
   return {
     c: 'Decl', ln, name,
     type: type && params.reduceRight((t, [x, ty]) => All(x, ty, t), type),
@@ -80,7 +129,8 @@ function Decl(ln: number, name: string, params: [string, Term][], type: Term, de
     theorem: dtype === "thm",
   };
 }
-function Rew(ln:number, lhs: Term, rhs: Term, name: string, check: boolean = true) : Instruction {
+
+function Rew(ln:number, lhs: Term, rhs: Term, name: string, check: boolean = true) : Rule {
   return { c: 'Rew', ln, lhs, rhs, name, check };
 }
 function DeclInj(ln:number, name: string) : Instruction {
@@ -124,29 +174,26 @@ function CmdDebugOff(ln:number) : Instruction {
 // Shifts variables deeper than [depth] by [inc] in the term [term]
 function shift(term:Term, inc=1, depth=0):Term {
   switch (term.c) {
-    case "Typ": return Typ();
+    case "Knd":
+    case "Typ":
+    case "Jok": return term;
     case "Var":
       return Var(term.index < depth ? term.index : term.index + inc);
     case "Ref":
       return Ref(term.name);
     case "All":
-      const dom = shift(term.dom, inc, depth);
-      const cod = shift(term.cod, inc, depth + 1);
-      return All(term.name, dom, cod);
+      return All(term.name,
+        shift(term.dom, inc, depth),
+        shift(term.cod, inc, depth + 1));
     case "Lam":
-      const type = term.type && shift(term.type, inc, depth);
-      const body = shift(term.body, inc, depth + 1);
-      return Lam(term.name, type, body);
+      return Lam(term.name, 
+        term.type && shift(term.type, inc, depth),
+        shift(term.body, inc, depth + 1));
     case "App":
       return App(shift(term.func, inc, depth), shift(term.argm, inc, depth));
     case "MVar":
-      if (term.joker) {
-        return term
-      } else {
-        return MVar(term.name, term.args.map((t:Term) => shift(t, inc, depth)));
-      }
-    default:
-      fail("Shift", `Unexpected constructor: ${term.c}`);
+      return MVar(term.name, term.args.map((t:Term) => shift(t, inc, depth)));
+    default: assertNever(term);
   }
 }
 
@@ -154,26 +201,27 @@ function shift(term:Term, inc=1, depth=0):Term {
 function same_head(a:Term, b:Term, acc:[Term,Term][]) {
   if (a.c !== b.c) { return false; }
   switch (a.c) {
-    case "Var": return a.index === b.index;
-    case "Ref": return a.name === b.name;
+    case "Typ":
+    case "Knd": 
+    case "Jok": break;
+    case "Var": return a.index === (b as typeof a).index;
+    case "Ref": return a.name === (b as typeof a).name;
     case "All":
-      acc.push([a.dom, b.dom], [a.cod, b.cod]);
+      acc.push([a.dom, (b as typeof a).dom], [a.cod, (b as typeof a).cod]);
       break;
     case "Lam":
-      acc.push([a.body, b.body]);
+      acc.push([a.body, (b as typeof a).body]);
       break;
     case "App":
-      acc.push([a.argm, b.argm], [a.func, b.func]);
+      acc.push([a.argm, (b as typeof a).argm], [a.func, (b as typeof a).func]);
       break;
     case "MVar":
-      if (a.name !== b.name || a.args.length !== b.args.length) { return false; }
+      if (a.name !== (b as typeof a).name || a.args.length !== (b as typeof a).args.length) { return false; }
       for (let i = 0; i < a.args.length; i++) {
-        acc.push([a.args[i], b.args[i]]);
+        acc.push([a.args[i], (b as typeof a).args[i]]);
       }
       break;
-    case "Typ":
-    case "Knd": break;
-    default: fail("Equals", `Non matching constructors: ${a.c} / ${b.c}`);
+    default: assertNever(a);
   }
   return true;
 }
@@ -182,26 +230,27 @@ function same_head(a:Term, b:Term, acc:[Term,Term][]) {
 function same_head_with_depth(a:Term, b:Term, d:number, acc:[Term,Term,number][]) {
   if (a.c !== b.c) { return false; }
   switch (a.c) {
-    case "Var": return a.index == b.index;
-    case "Ref": return a.name == b.name;
+    case "Typ":
+    case "Knd": 
+    case "Jok": break;
+    case "Var": return a.index == (b as typeof a).index;
+    case "Ref": return a.name == (b as typeof a).name;
     case "All":
-      acc.push([a.dom, b.dom, d], [a.cod, b.cod, d + 1]);
+      acc.push([a.dom, (b as typeof a).dom, d], [a.cod, (b as typeof a).cod, d + 1]);
       break;
     case "Lam":
-      acc.push([a.body, b.body, d + 1]);
+      acc.push([a.body, (b as typeof a).body, d + 1]);
       break;
     case "App":
-      acc.push([a.func, b.func, d], [a.argm, b.argm, d]);
+      acc.push([a.func, (b as typeof a).func, d], [a.argm, (b as typeof a).argm, d]);
       break;
     case "MVar":
-      if (a.name !== b.name || a.args.length !== b.args.length) { return false; }
+      if (a.name !== (b as typeof a).name || a.args.length !== (b as typeof a).args.length) { return false; }
       for (let i = 0; i < a.args.length; i++) {
-        acc.push([a.args[i], b.args[i], d]);
+        acc.push([a.args[i], (b as typeof a).args[i], d]);
       }
       break;
-    case "Typ":
-    case "Knd": break;
-    default: fail("Equals", `Non matching constructors: ${a.c} / ${b.c}`);
+    default: assertNever(a);
   }
   return true;
 }

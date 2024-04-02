@@ -8,10 +8,10 @@ function pp_term_wp(term:Term, ctx=Ctx()) : string {
     case "App":
     case "All":
     case "Lam": return "("+pp_term(term,ctx)+")";
-    case "PreScope": return '?'+term.name;
     case "Ref" : return term.name;
-    case "MVar": return term.joker ? '*' : term.name+"["+term.args.map((x:Term)=>pp_term(x,ctx)).join(',')+"]";
-    default: fail("PP",`Unexpected term constructor [${term.c}]`);
+    case "Jok" : return '*';
+    case "MVar": return term.name+"["+term.args.map((x:Term)=>pp_term(x,ctx)).join(',')+"]";
+    default: assertNever(term);
   }
 }
 
@@ -30,10 +30,9 @@ function pp_term(term:Term, ctx = Ctx()) : string {
     case "Lam":
       let body = pp_term(term.body, extend(ctx, [term.name, Joker()]));
       return "(" + (term.type ? "("+term.name+" : "+pp_term(term.type,ctx)+")" : term.name) + " => "+body+")";
-    case "Knd": case "Typ": case "Var": case "PreScope": case "Ref": case "MVar":
+    case "Knd": case "Typ": case "Var": case "Ref": case "MVar": case "Jok":
       return pp_term_wp(term, ctx);
-    default:
-      fail("PP",`Unexpected term constructor [${term.c}]`);
+    default: assertNever(term);
   }
 }
 

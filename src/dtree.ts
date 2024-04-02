@@ -4,23 +4,23 @@
  * 
  */
 
-type ExRule = Rule &  { head:Term, stack:any[] };
+type ExRule = Rule &  { head:string, stack:any[] };
 
-type RuleRow = { rule:ExRule, cols:Term[]}
+type RuleRow = { rule:ExRule, cols:(Term|null)[]}
 type RuleMatrix = { rows: RuleRow[], depths: number[] }
 
 type DTreeTest = {
   index:number,
-  name:string,
+  name:string|number|null,
   subst:number[],
   depth:number,
-  args: number[],
+  args: Term[],
   joker_match: boolean
 }
 
 type DTreeNode = {
   c:'Switch',
-  index:number
+  index:number,
   Lam ?: DTreeNode,
   Var ?: { [k:number]: { [k:number]: DTreeNode} },
   Ref ?: { [k:string]: { [k:number]: DTreeNode} },
@@ -31,6 +31,7 @@ type DTreeNode = {
   rule:ExRule,
   def:DTreeNode
 } | null
+
 type DTree = {
   c:'DTree',
   arity: number,
@@ -82,15 +83,15 @@ function compute_decision_tree(rules:ExRule[], arity:number) : DTree {
 function compute_dtree(m:RuleMatrix) : DTreeNode {
   if (m.rows.length == 0) { return null; }
   // Find the first column [j] that is not a meta-var in the first row of patterns
-  const j = m.rows[0].cols.findIndex((p) => p.c != "MVar");
-  if (j<0) {
+  const j = m.rows[0].cols.findIndex((p) => p && p.c !== "MVar");
+  if (j < 0) {
     return compute_matching_problem(m.rows[0], m.depths,
       compute_dtree({rows:m.rows.slice(1), depths:m.depths.slice(1)}));
   } else {
     const res: DTreeNode = { c:'Switch', index:j, def:null };
     for (let i = 0; i < m.rows.length; i++) {
       const row = m.rows[i];
-      const [pat,stack] = get_head(row.cols[j]);
+      const [pat,stack] = get_head( (row.cols[j] as Term) );
       switch (pat.c) {
         case "Lam":
           if (!res.Lam) {
@@ -101,7 +102,7 @@ function compute_dtree(m:RuleMatrix) : DTreeNode {
           if (!res.Var) { res.Var = {}; }
           if (!res.Var[pat.index]) { res.Var[pat.index] = {}; }
           if (!res.Var[pat.index][stack.length]) {
-            res.Var[pat.index][stack.length] = specialize(m,j,'Var',pat.index,pat.stack.length);
+            res.Var[pat.index][stack.length] = specialize(m,j,'Var',pat.index,stack.length);
           }
           break;
         case "Ref":
@@ -119,23 +120,30 @@ function compute_dtree(m:RuleMatrix) : DTreeNode {
   }
 }
 
-function specialize_row(cols:Term[], j:number, cons:string|null, name:string|number|null, extra_cols:number) {
-  const [pat,stack] = get_head(cols[j]);
+function specialize_row(cols:(Term|null)[], j:number, cons:string|null, name:string|number|null, extra_cols:number) {
+  const [pat,stack] = get_head(cols[j] as Term);
   if (pat.c == 'MVar') {
-    return cols.concat(Array(extra_cols).fill(Joker()));
+    return cols.concat(Array(extra_cols).fill(null));
   }
   if (pat.c != cons) { return null; }
-  if (cons!='Lam' && ( (pat.name || pat.index) != name || stack.length != extra_cols)) { return null; }
-  const ncols = cols.concat( cons == 'Lam' ? [pat.body] : stack );
-  ncols[j] = Joker();
+  if (pat.c != 'Lam' && (
+         stack.length != extra_cols
+      || (pat.c === 'Var' && pat.index !== name ) 
+      || (pat.c === 'Ref' && pat.name  !== name ))) {
+    return null;
+  }
+  const ncols = cols.concat( pat.c == 'Lam' ? [pat.body] : stack );
+  ncols[j] = null;
   return ncols;
 }
 
-function specialize(m:RuleMatrix, j:number, cons:string|null, index:number|null, extra_cols:number) : DTreeNode {
+function specialize(m:RuleMatrix, j:number, cons:string|null, index:number|string|null, extra_cols:number) : DTreeNode {
   const rows = [];
   for (let i = 0; i < m.rows.length; i++) {
     const cols = specialize_row(m.rows[i].cols,j,cons,index,extra_cols);
-    if (cols) { rows.push( { cols:cols, rule:m.rows[i].rule } ); }
+    if (cols) {
+      rows.push( { cols:cols, rule:m.rows[i].rule } );
+    }
   }
   return compute_dtree({
     rows:rows,
@@ -169,10 +177,10 @@ function get_meta_match(args:Term[], depth:number) : number[] {
 }
 
 function compute_matching_problem(row:RuleRow, depths:number[], def:DTreeNode = null) : DTreeNode {
-  const mvars = [];
+  const mvars : DTreeTest[] = [];
   for (let i = 0; i < row.cols.length; i++) {
     const p = row.cols[i];
-    if (p.c == 'MVar' && !p.joker) {
+    if (p && p.c == 'MVar') {
       mvars.push({
         index:i,
         name:p.name,
@@ -187,7 +195,7 @@ function compute_matching_problem(row:RuleRow, depths:number[], def:DTreeNode = 
 }
 
 
-function pp_dtrees(dtrees: DTreeNode[]) {
+function pp_dtrees(dtrees: (DTree|null)[]) {
   let res = "Count arguments:\n";
   function pp(t:number, s:string) { res += '  '.repeat(t)+s+"\n"; }
   function pp_dtree(dtree:DTreeNode, t:number) {
@@ -217,7 +225,7 @@ function pp_dtrees(dtrees: DTreeNode[]) {
     } else if (dtree.c === 'Test') {
       pp(t,"Match:");
       dtree.match.forEach((m)=>
-        pp(t,`${m.name}[${m.args.map((i)=>pp_term(Var(i))).join(', ')}] = stack[${m.index}]`)
+        pp(t,`${m.name}[${m.args.map((i)=>pp_term(i)).join(', ')}] = stack[${m.index}]`)
       );
       pp(t,"> Fire rule `"+dtree.rule.name+"`: "+pp_term(dtree.rule.rhs));
     }
@@ -228,7 +236,7 @@ function pp_dtrees(dtrees: DTreeNode[]) {
   for (let i = 0; i < dtrees.length; i++) {
     res += `Case ${i}:\n`;
     const dt = dtrees[i];
-    if (dt) { pp_dtree(dt, 1); }
+    if (dt) { pp_dtree(dt.tree, 1); }
     else { res += "  not computed yet...\n"; }
   }
   return res;

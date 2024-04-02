@@ -84,18 +84,17 @@ function is_non_pattern_instance(term:Term) {
   return false;
 }
 
-
 /** Meta-variables substitution
  *
  * Relies on a map associating each meta-variable name
  * to (an array of memoised shifted) term(s) with which to substitute.
  */
-function meta_map_subst(term:Term, subst : Map<string,Term>, depth=0) : Term {
+function meta_map_subst(term:Term, subst : {forEach : (f:(v:Term, k:string|number|null)=>void)=>void }, depth=0) : Term {
   // Shift memoisation : maps metavar name to multiple shifted values
   let ct = 0; // Compteur de substitutions
-  const map : Map<string,Term[]> = new Map();
+  const map : Map<string|number|null, Term[]> = new Map();
   subst.forEach((v,k)=>map.set(k,[v]));
-  function ms(t:Term, d:number) {
+  function ms(t:Term, d:number) : Term {
     const cta = ct;
     if (t.c === "MVar") {
       const args = t.args.map((t:Term)=>ms(t,d));
@@ -128,7 +127,7 @@ function meta_map_subst(term:Term, subst : Map<string,Term>, depth=0) : Term {
 }
 
 type TypeAssumption =  {
-  name : string,
+  name : string|number|null,
   ctx  : Term[],
   args : string[],
   type : Term
@@ -191,7 +190,7 @@ class AssumptionSet {
       //console.log("ConvU:",pp_term(a),"<<-?->>",pp_term(b));
       if (equals(a,b)) { continue; }
       const whnfa = this.red.whnf(a);
-      if (whnfa.c==='MVar' && /^![0-9]+$/.test(whnfa.name)) {
+      if (whnfa.c === 'MVar' && typeof whnfa.name === 'string' && /^![0-9]+$/.test(whnfa.name)) {
         const index = parseInt(whnfa.name.substring(1));
         if (i !== undefined && index >= i) { fail('ConvCheck RHS','This should not happen'); }
         const match = meta_match(b, get_partial_meta_match(whnfa.args, d), whnfa.args.length, d);
@@ -210,7 +209,7 @@ class AssumptionSet {
   whnf(term:Term) : Term { return this.red.whnf( this.msubst(term) ); }
 
   // Extend the substitution with {x => t}
-  extend_subst(x:string, t:Term) {
+  extend_subst(x:string|number|null, t:Term) {
     // apply current meta-substitution to b
     const val = this.msubst(t);
     // Build the meta-subst {X => b}
@@ -255,9 +254,9 @@ class AssumptionSet {
       else if (b.c === 'MVar') { this.assume_conv(b,a); }
       else if (a.c !== b.c)   { this.assume_conv(a,b); }
       else if (a.c === "All") {
-        acc.push([a.dom,b.dom] , [a.cod,b.cod]);
+        acc.push([a.dom, (b as typeof a).dom] , [a.cod, (b as typeof a).cod]);
       } else if (a.c === "Lam") {
-        acc.push([a.body,b.body]);
+        acc.push([a.body, (b as typeof a).body]);
       } else if (a.c === "App") {
         const [head_a, args_a] = get_head(a);
         const [head_b, args_b] = get_head(b);
@@ -279,7 +278,7 @@ class AssumptionSet {
 
   
   // Record a new type assumption
-  assume_mvar_type(term:Term, expected_type:Term, ctx:Ctxt) {
+  assume_mvar_type(term: TermMVar, expected_type:Term, ctx:Ctxt) {
     const acc : Term[] = [];
     while (ctx) { acc.push(ctx.head[1]); ctx = ctx.tail; }
     acc.reverse();
@@ -287,7 +286,7 @@ class AssumptionSet {
       {
         name : term.name,
         ctx  : acc.map((x,i)=> vars_to_meta(x,i)),
-        args : term.args.map( (t:Term) =>'!'+(acc.length-t.index-1)),
+        args : term.args.map( (t:Term) =>'!'+(acc.length - (t as TermVar).index-1)),
         type : vars_to_meta(expected_type,acc.length),
       });
   }
@@ -323,7 +322,7 @@ class RuleChecker {
   // for some substitution S of the locally bound variables
   // If [expected_type] is provided then the inferred type is checked to be unifiable with it
   // for some extension of S
-  rhs_infer_mvar_type(assumptions:AssumptionSet, term:Term, ctx:Ctxt, expected_type?:Term) {
+  rhs_infer_mvar_type(assumptions:AssumptionSet, term:TermMVar, ctx:Ctxt, expected_type?:Term) {
     //console.log("RHS Infer MVar: Inferring the type of meta-variable instance `" + pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
     for (let k = 0; k < assumptions.assumed_types.length; k++) {
       const assumption = assumptions.assumed_types[k];
@@ -445,7 +444,9 @@ class RuleChecker {
     } else {
       const type = assumptions.whnf(expected_type);
       if (type.c === "All" && term.c === "Lam") {
-        if (!term.type.joker) { fail("LHS Check", "Please avoid type annotations in LHS..."); }
+        if (term.type.c !== 'Jok') {
+          fail("LHS Check", "Type annotations are ignored in LHS and should be avoided");
+        }
         this.lhs_infer(assumptions, type.dom, ctx);
         this.lhs_check(assumptions, term.body, type.cod, extend(ctx, [type.name, type.dom]) );
       } else {
@@ -479,7 +480,7 @@ class RuleChecker {
         }
         return cod_sort;
       case "Lam":
-        if (term.type === null || (term.type.c == 'MVar' && term.type.joker) ) {
+        if (term.type.c == 'Jok') {
           fail("Infer","Can't infer unannotated lambda `" +
             pp_term(term,ctx) + "`.\n" + pp_context(ctx)+ assumptions.pp());
         } else {
@@ -518,10 +519,10 @@ class RuleChecker {
     const type = assumptions.whnf(expected_type);
     if (type.c === "All" && term.c === "Lam") {
       this.rhs_infer(assumptions, type, ctx);
-      if (term.type.joker) {
+      if (term.type.c === 'Jok') {
         term.type = type.dom;
       } else if (!assumptions.are_convertible(term.type, type.dom)) {
-        fail("RHS Check", "Incompatible annotation `"+pp_term(term, ctx)+"`.\n"+
+        fail("RHS Check", `Incompatible annotation [${pp_term(term, ctx)}].\n`+
           "- Expect = " + pp_term(type.dom , ctx)+"\n"+
           "- Actual = " + pp_term(term.type, ctx)+"\n"+
           pp_context(ctx) + assumptions.pp());
@@ -567,7 +568,7 @@ class RuleChecker {
         }
         return cod_sort;
       case "Lam":
-        if (term.type === null || (term.type.c == 'MVar' && term.type.joker) ) {
+        if (term.type.c === 'Jok') {
           fail("RHS Infer Unify","Can't infer unannotated lambda `" +
             pp_term(term,ctx) + "`.\n" + pp_context(ctx)+ assumptions.pp());
         } else {
@@ -607,7 +608,8 @@ class RuleChecker {
     const type = assumptions.whnf(expected_type);
     if (type.c === "All" && term.c === "Lam") {
       this.rhs_infer_unify(assumptions, type, ctx, S, i);
-      if (term.type.joker) {
+      debug.log(term.type.c);
+      if (term.type.c === 'Jok') {
         term.type = type.dom;
       } else if (!assumptions.are_convertible_unify(term.type, type.dom, S, i)) {
         fail("RHS Check Unify", "Incompatible annotation `"+pp_term(term, ctx)+"`.\n"+
@@ -633,7 +635,7 @@ class RuleChecker {
   ////////////////////       Rule  Checking  ///////////////////
   //////////////////////////////////////////////////////////////
 
-  check_rule_well_formed(rule:ExRule) {
+  check_rule_well_formed(rule:Rule) {
     if (!is_closed(rule.lhs)) { fail("Rule","LHS must be a closed term."); }
     if (!is_closed(rule.rhs)) { fail("Rule","RHS must be a closed term."); }
     // A pattern is ill-formed if a subterm is a non-pattern or applied meta-variable instance
@@ -658,7 +660,7 @@ class RuleChecker {
     }
   }
 
-  check_rule_type_preservation(rule:ExRule) {
+  check_rule_type_preservation(rule:Rule) {
     if (!rule.check) { return; }
     const assumptions = new AssumptionSet(this.red);
     const inferred_type = this.lhs_infer(assumptions, rule.lhs);
@@ -666,7 +668,7 @@ class RuleChecker {
   }
 
   // Checks type preservation and add a new rule to the reduction machine
-  declare_rule(rule:ExRule) {
+  declare_rule(rule:Rule) {
     const [hd,tl] = get_head(rule.lhs);
     if (hd.c!=="Ref") { fail("Rule","LHS must be headed by a symbol."); }
     const smb = this.env.get(hd.name);

@@ -77,15 +77,7 @@ class State {
     return this.head.c;
   }
 
-
-  getHeadName() : string {
-    return this.head.name;
-  }
-
-  getHeadIndex() : number {
-    return this.head.index;
-  }
-
+  /*
   getHeadDom() : ShiftedState {
     return new State(this.head.dom, this.ctxt).getShifted(0);
   }
@@ -106,6 +98,7 @@ class State {
   getHeadCod() : ShiftedState {
     return new State(this.head.cod, this.ctxt.shift_extend()).getShifted(0);
   }
+  */
 
   nbArgs() : number {
     return this.stack.length;
@@ -236,24 +229,11 @@ class ShiftedState {
     return this.state.to_term(s+this.shift);
   }
 
-  getHeadC() {
-    return this.state.getHeadC();
-  }
-
-  getHeadName() {
-    return this.state.getHeadName();
-  }
-
-  getHeadIndex() {
-    return this.state.getHeadIndex()+this.shift;
-  }
-
+  /*
   getHeadBody() {
-    if (!this.state.getHeadBody()) {
-      throw("debug");
-    }
     return this.state.getHeadBody().getShifted(this.shift);
   }
+  */
 
   nbArgs() {
     return this.state.nbArgs();
@@ -352,7 +332,7 @@ class SimpleMatch {
   }
 
   meta_apply(args:ShiftedState[]) : ShiftedState {
-    if (args.every( (e,i) => e.getHeadC() === 'Var' && e.getHeadIndex() === i )) {
+    if (args.every( (e,i) => e.state.head.c === 'Var' && e.state.head.index+e.shift === i )) {
       // When substituting in instances X[x,y,...]
       // where arguments are also all locally bound variables in their DB order
       // we can reuse the state
@@ -372,9 +352,9 @@ type Match = SimpleMatch | ComplexMatch;
  * It can be applied to terms.
  */
 class Context {
-  meta : Map<number, Match>;
-  depth:number;
-  subst:AbstractState[];
+  readonly meta : Map<number|string|null, Match>;
+  readonly depth:number;
+  readonly subst:AbstractState[];
 
   constructor(meta=new Map(), depth=0, subst:AbstractState[]=[]) {
     this.meta = meta;
@@ -385,6 +365,10 @@ class Context {
     // Array of states substituable to meta-variables
   }
 
+  statify(t:Term) : ShiftedState {
+    return new State(t,this).getShifted(0);
+  }
+  
   isEmpty() {
     return this.meta.size == 0 && this.depth == 0 && this.subst.length == 0;
   }
@@ -442,7 +426,8 @@ class Context {
           // TODO: consider the case t.args empty
           // TODO: Avoid recomputing : self.shift_extend_d(d) for each args
           ct += 1; // Meta-substitution effectuée
-          const state_args = t.args.map( (t:Term)=>new State(t,self.shift_extend_d(d)) );
+          const ext_d = self.shift_extend_d(d);
+          const state_args = t.args.map( (t:Term) => ext_d.statify(t) );
           return meta_state.meta_apply(state_args).to_term(d+self.depth);
         }
       } else if (t.c === "Var") {
@@ -512,14 +497,17 @@ class ReductionEngine {
     }
   }
 
-  add_new_rule(rule:ExRule) {
+  add_new_rule(rule:Rule) {
     // Find the head symbol and the stack of the rule
     const [head,stack] = get_head(rule.lhs);
     if (head.c !== 'Ref') {
       fail("Scope", `Unexpected head symbol in rule left-hand side: ${head.c}`);
     }
-    rule.head = head.name;
-    rule.stack = stack;
+    const exrule : ExRule = {
+      ...rule,
+      head: head.name,
+      stack: stack
+    };
     const smb = this.get(head.name);
     if (!smb) {
       fail("RuleAdd", `The symbol [${head.name}] doesn't exist.`);
@@ -528,7 +516,7 @@ class ReductionEngine {
       fail("RuleAdd", `The injective symbol [${head.name}] cannot be rewritten with a new rule.`);
     }
     // The new rule is added to the global set of rules for that symbol
-    smb.rules.push(rule);
+    smb.rules.push(exrule);
     const dts = smb.decision_trees;
     const arity = stack.length;
     // All DTs of arity greater than that of the new rule are erased
@@ -549,7 +537,7 @@ class ReductionEngine {
   }
 
   // Get the decision tree of given symbol when applied to this many arguments
-  get_decision_tree(name:string, arity:number) {
+  get_decision_tree(name:string, arity:number) : DTree | null {
     const r = this.red.get(name);
     if (!r || !r.rules.length) { return null; }
     const dts = r.decision_trees;
@@ -575,38 +563,39 @@ class ReductionEngine {
   // Move all this to a class
 
   // Reduces a term until a normal form is found
-  whnf(term:Term) { return this.whnf_state( new State(term).getShifted(0) ).to_term(); }
-    nf(term:Term) { return   this.nf_state( new State(term).getShifted(0) ).to_term();}
+  whnf(term:Term) : Term { return this.whnf_state( new State(term).getShifted(0) ).to_term(); }
+    nf(term:Term) : Term { return   this.nf_state( new State(term).getShifted(0) ).to_term();}
 
 
   /** Computes the strong normal form of a state
   */
-  nf_state(state:ShiftedState) {
+  nf_state(state:ShiftedState) : ShiftedState {
     //console.log("[NF] Computing WHNF of "+state.pp());
     this.whnf_state(state);
     //console.log("[NF] Computed WHNF: "+pp_term(state.to_term()));
     const s = state.state;
     for (let i=0; i < s.stack.length; i++) { s.stack[i] = this.nf_state(s.stack[i]); };
-    switch (s.head.c) {
+    const head = s.head;
+    switch (head.c) {
       case "All":
         s.head = All(
-          s.head.name,
-          this.nf_state( s.getHeadDom() ).to_term(),
-          this.nf_state( s.getHeadCod() ).to_term());
+          head.name,
+          this.nf_state( s.ctxt               .statify(head.dom) ).to_term(),
+          this.nf_state( s.ctxt.shift_extend().statify(head.cod) ).to_term());
         break;
-      case "Lam":
+      case "Lam": {
         s.head = Lam(
-          s.head.name,
-          this.nf_state( s.getHeadType() ).to_term(),
-          this.nf_state( s.getHeadBody() ).to_term());
+          head.name,
+          this.nf_state( s.ctxt               .statify(head.type) ).to_term(),
+          this.nf_state( s.ctxt.shift_extend().statify(head.body) ).to_term());
         break;
+      }
       case "MVar":
-        s.head = MVar(s.head.name,
-          s.getHeadArgs().map( (e)=> this.nf_state(e).to_term()));
+        s.head = MVar(head.name,
+          head.args.map( (t:Term) => this.nf_state( s.ctxt.statify(t) ).to_term()));
         break;
       case "App":
         throw("This should not happen");
-        break;
     }
     return state;
   }
@@ -620,7 +609,7 @@ class ReductionEngine {
   whnf_state(s:ShiftedState) : ShiftedState {
     while (true) {
       const state : State = s.state;
-      //console.log(" ".repeat(logdepth)+"WHNF:", s.pp());
+      debug.log(`WHNF: ${s.pp()}`);
       while (state.head.c === "App") {
         // Push the state version of the argument on the stack
         state.stack.push( new State(state.head.argm, state.ctxt).getShifted(0) );
@@ -631,26 +620,25 @@ class ReductionEngine {
         case "Lam":
           // Unapplied lambda is a WHNF
           const first_arg = state.stack.pop();
-          if (first_arg === undefined) {
-            return s;
-          } else {
-            // Otherwise add the top stack argument to the substitution
-            // and compute the WHNF of the body (\x.t) u1 u2 ... --> t[x\u1] u2 ...
-            state.head = state.head.body;
-            state.ctxt = state.ctxt.extend(first_arg);
-          }
+          if (first_arg === undefined) { return s; }
+          // Otherwise add the top stack argument to the substitution
+          // and compute the WHNF of the body (\x.t) u1 u2 ... --> t[x\u1] u2 ...
+          state.head = state.head.body;
+          state.ctxt = state.ctxt.extend(first_arg);
           break;
         case "Ref": // Potential redex
-          const rule_name = this.head_rewrite(s);
+          const rule_name = this.head_rewrite(state, this.get_decision_tree(state.head.name, state.stack.length));
           // If rewriting occured, proceed with current state, otherwise return
           if (!rule_name) { return s; }
           break;
-        case "MVar":
+        case "MVar": {
           const meta_state = state.ctxt.meta.get( state.head.name );
           if (!meta_state) { return s; }
-          const meta_subst_state = meta_state.meta_apply(state.getHeadArgs());
+          const args = state.head.args.map( (t:Term) => state.ctxt.statify(t) );
+          const meta_subst_state = meta_state.meta_apply(args);
           s.link_to(meta_subst_state);
           break;
+        }
         case "Var":
           if (state.head.index >= state.ctxt.subst.length) {
             return s;
@@ -670,28 +658,27 @@ class ReductionEngine {
   // Applies a (single) rewrite step at the head if any rule matches at the head
   // Updates [state] in place and returns the name of the rule used or null if no step was performed
   // asserts: state instanceof State
-  head_rewrite(s: ShiftedState) : string | null {
+  head_rewrite(state:State, dtree:DTree|null) : string | null {
     // Getting the head symbol's decision tree
-    const state = s.state;
-    const dtree = this.get_decision_tree(state.head.name, state.stack.length);
+    //const state = s.state;
     if (!dtree) { return null; }
     // Truncate to keep only the first [arity] arguments from the top of the stack
     const truncated_stack = state.stack.slice(state.stack.length-dtree.arity);
     // Running the decision tree with the given args (in order)
 
-    //console.log(" ".repeat(logdepth)+"Rewriting: "+pp_term(state.to_term()) );
-    //logdepth += 1;
+    debug.log(`Rewriting: ${pp_term(state.to_term())}`);
+    debug.increment();
     let [rule, meta_subst] = this.exec_dtree(dtree.tree, truncated_stack);
-    //logdepth -= 1;
+    debug.decrement();
 
     if (!rule) {
-      //console.log(" ".repeat(logdepth)+"NoRew");
+      debug.log("NoRew");
       return null;
     }
     state.head = rule.rhs;
     state.stack = state.stack.slice(0,state.stack.length-rule.stack.length);
     state.ctxt = new Context(meta_subst);
-    //console.log( " ".repeat(logdepth)+"RW:"+rule.name+" > "+pp_term(state.to_term()) );
+    debug.log(`RW:${rule.name} > ${pp_term(state.to_term())}`);
     return rule.name;
   }
 
@@ -700,32 +687,30 @@ class ReductionEngine {
     if (!dtree) { return [null,undefined]; }
     if (dtree.c === 'Switch') {
       const st = stack[dtree.index];
-      if (!(st instanceof ShiftedState)) {
-        console.log("[exec_dtree] This should not happen !");
-        throw("[exec_dtree] This should not happen !");
-      }
       this.whnf_state(st);
       // whnf should be a fully unfolded (head is not an App) and compressed (not a shift of a shift) state
-      switch (st.getHeadC()) {
+      const head:Term = st.state.head;
+      switch (head.c) {
         case 'Lam':
           if (!dtree.Lam) { return this.exec_dtree(dtree.def,stack); }
-          stack.push( st.getHeadBody() );
+          stack.push( st.state.ctxt.shift_extend().statify(head.body).getShifted(st.shift) );
           return this.exec_dtree(dtree.Lam,stack);
         case 'Ref':
-          if (!dtree.Ref                               ) { return this.exec_dtree(dtree.def,stack); }
-          if (!dtree.Ref[st.getHeadName()]             ) { return this.exec_dtree(dtree.def,stack); }
-          if (!dtree.Ref[st.getHeadName()][st.nbArgs()]) { return this.exec_dtree(dtree.def,stack); }
+          if (!dtree.Ref                        ) { return this.exec_dtree(dtree.def,stack); }
+          if (!dtree.Ref[head.name]             ) { return this.exec_dtree(dtree.def,stack); }
+          if (!dtree.Ref[head.name][st.nbArgs()]) { return this.exec_dtree(dtree.def,stack); }
           st.forEachArg((e)=>stack.push(e));
-          return this.exec_dtree(dtree.Ref[st.getHeadName()][st.nbArgs()],stack);
+          return this.exec_dtree(dtree.Ref[head.name][st.nbArgs()],stack);
         case 'Var':
-          if (!dtree.Var                                ) { return this.exec_dtree(dtree.def,stack); }
-          if (!dtree.Var[st.getHeadIndex()]             ) { return this.exec_dtree(dtree.def,stack); }
-          if (!dtree.Var[st.getHeadIndex()][st.nbArgs()]) { return this.exec_dtree(dtree.def,stack); }
+          if (!dtree.Var                                  ) { return this.exec_dtree(dtree.def,stack); }
+          if (!dtree.Var[head.index+st.shift]             ) { return this.exec_dtree(dtree.def,stack); }
+          if (!dtree.Var[head.index+st.shift][st.nbArgs()]) { return this.exec_dtree(dtree.def,stack); }
           st.forEachArg((e)=>stack.push(e));
-          return this.exec_dtree(dtree.Var[st.getHeadIndex()][st.nbArgs()], stack);
+          return this.exec_dtree(dtree.Var[head.index+st.shift][st.nbArgs()], stack);
         case 'MVar':
           return this.exec_dtree(dtree.def,stack);
-        default: fail("DTreeExec","Unexpected constructor in switch case: "+st.getHeadC());
+        default:
+          fail("DTreeExec", `Unexpected constructor in switch case: ${st.state.head.c}`);
       }
     } else if (dtree.c === 'Test') {
       const subst = new Map();
@@ -764,7 +749,7 @@ class ReductionEngine {
           // Then prev_matched.map = [1, 0, undefined]  and  prev_matched.term = u
           // We need to check that   t <<->> u{ 1 <- 2, 0 <- 1}
           // or, equivalently, that  u <<->> t{ 2 <- 1, 1 <- 0}
-          const matched_args = m.args.map( (j) => new State(Var(j)).getShifted(0) );
+          const matched_args = m.args.map( (t:Term) => new State(t).getShifted(0) );
           if (!this.are_convertible(prev_matched.meta_apply(matched_args).to_term(), matched.meta_apply(matched_args).to_term())) {
             return this.exec_dtree(dtree.def,stack);
           }
