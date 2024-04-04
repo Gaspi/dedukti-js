@@ -322,7 +322,7 @@ class RuleChecker {
   // for some substitution S of the locally bound variables
   // If [expected_type] is provided then the inferred type is checked to be unifiable with it
   // for some extension of S
-  rhs_infer_mvar_type(assumptions:AssumptionSet, term:TermMVar, ctx:Ctxt, expected_type?:Term) {
+  rhs_infer_mvar_type(assumptions:AssumptionSet, term:TermMVar, ctx:Ctxt, expected_type?:Term) : Term {
     //console.log("RHS Infer MVar: Inferring the type of meta-variable instance `" + pp_term(term, ctx) + "`.\n" + pp_context(ctx) + assumptions.pp());
     for (let k = 0; k < assumptions.assumed_types.length; k++) {
       const assumption = assumptions.assumed_types[k];
@@ -370,7 +370,7 @@ class RuleChecker {
           if (!assumptions.are_convertible_unify(inf_final_type, expected_type, S)) { throw("[rhs_infer_mvar_type] This should not escape"); }
           // check that the extension of S is still ok (might require even further extension of S)
           while (!aux(this)) {}
-          return; // The check is successful, return
+          return inf_final_type; // The check is successful, return
         }
       } catch (e) {} // Ignore errors and proceed with the next assumption instead
     }
@@ -384,7 +384,7 @@ class RuleChecker {
   //////////////////////////////////////////////////////////////
 
   // Infers the type of a term
-  lhs_infer(assumptions:AssumptionSet, term:Term, ctx:Ctxt = null) {
+  lhs_infer(assumptions:AssumptionSet, term:Term, ctx:Ctxt = null) : Term {
     //console.log("LHS Infer",pp_term(term,ctx));
     switch (term.c) {
       case "Knd": fail("LHS Infer","Cannot infer the type of Kind !");
@@ -424,7 +424,7 @@ class RuleChecker {
         this.lhs_check(assumptions, term.argm, func_t.dom, ctx);
         return subst(func_t.cod, term.argm);
       case "Ref": return this.env.do_get(term.name).type;
-      case "Var": return get_term(ctx, term.index);
+      case "Var": return get_term(ctx, term.index) || fail("LHS Check", "Free variable in LHs (somehow)");
       case "MVar":
         fail("LHS Check", "Could not infer the type of meta-variable instance `"+
           pp_term(term, ctx)+"`.\nThis should not happen... LHS is probably ill-formed (?)\n"+
@@ -462,7 +462,7 @@ class RuleChecker {
 
   // Infers the type of a RHS meta-term assuming the given assumptions
   // (that were inferred from typing the LHS)
-  rhs_infer(assumptions:AssumptionSet, term:Term, ctx=Ctx()) {
+  rhs_infer(assumptions:AssumptionSet, term:Term, ctx=Ctx()) : Term {
     //console.log("RHS Infer",term.c,term,pp_term(term,ctx));
     switch (term.c) {
       case "Knd": fail("RHS Infer","Cannot infer the type of Kind !");
@@ -550,7 +550,7 @@ class RuleChecker {
 
   // Infers the type of a RHS meta-term assuming the given assumptions
   // (that were inferred from typing the LHS)
-  rhs_infer_unify(assumptions:AssumptionSet, term:Term, ctx:Ctxt, S:Map<string,Term>, i:number) {
+  rhs_infer_unify(assumptions:AssumptionSet, term:Term, ctx:Ctxt, S:Map<string,Term>, i:number) : Term {
     //console.log("RHS Infer Unify",term.c,term,pp_term(term,ctx));
     switch (term.c) {
       case "Knd": fail("RHS Infer Unify","Cannot infer the type of Kind !");
@@ -573,7 +573,7 @@ class RuleChecker {
             pp_term(term,ctx) + "`.\n" + pp_context(ctx)+ assumptions.pp());
         } else {
           const body_t = this.rhs_infer_unify(assumptions, term.body, extend(ctx, [term.name, term.type]), S, i);
-          const term_t = All(term.name, term.type, body_t);
+          const term_t : Term = All(term.name, term.type, body_t);
           this.rhs_infer_unify(assumptions, term_t, ctx, S, i);
           return term_t;
         }
@@ -608,7 +608,6 @@ class RuleChecker {
     const type = assumptions.whnf(expected_type);
     if (type.c === "All" && term.c === "Lam") {
       this.rhs_infer_unify(assumptions, type, ctx, S, i);
-      debug.log(term.type.c);
       if (term.type.c === 'Jok') {
         term.type = type.dom;
       } else if (!assumptions.are_convertible_unify(term.type, type.dom, S, i)) {

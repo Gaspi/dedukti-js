@@ -113,7 +113,7 @@ sterm ->
     %JOKER                      {% () => Joker() %}
   | %TYPE                       {% () => Typ()  %}
   | %KIND                       {% () => Knd()  %}
-  | id %LEFTSQU args %RIGHTSQU {% ([id,,args]) => PMVar(id,args) %}
+  | id %LEFTSQU args %RIGHTSQU {% ([id,,args]) => MVar(id,args) %}
   | id                         {% ([id]) => PreScope(id) %}
   | %QID                        {% ([id]) => PreRef(id.value) %}
   | %DB_INDEX                   {% ([dbi]) => Var( parseInt(dbi.value.substring(1)) ) %}
@@ -123,11 +123,11 @@ aterm -> sterm sterm:* {% ([te,ts]) => app(te,ts) %}
 
 term ->
     aterm                                             {% ([t]) => t %}
-  | id %COLON aterm %ARROW term                       {% ([ id,,dom,  ,cod ]) => PAll(id,dom,cod)      %}
-  | %LEFTPAR id %COLON aterm %RIGHTPAR %ARROW term    {% ([,id,,dom,, ,cod ]) => PAll(id,dom,cod)      %}
-  | aterm %ARROW term                                 {% ([     dom,  ,cod ]) => PAll(null,dom,cod)    %}
-  | id              %FATARROW term                    {% ([ id,       ,body]) => PLam(id,Joker(),body) %}
-  | id %COLON aterm %FATARROW term                    {% ([ id,,type, ,body]) => PLam(id,type,body)    %}
-  | %LEFTPAR id %COLON aterm %RIGHTPAR %FATARROW term {% ([,id,,type,,,body]) => PLam(id,type,body)    %}
+  | id %COLON aterm %ARROW term                       {% ([ id,,dom,  ,cod ]) => All(id,dom,cod)      %}
+  | %LEFTPAR id %COLON aterm %RIGHTPAR %ARROW term    {% ([,id,,dom,, ,cod ]) => All(id,dom,cod)      %}
+  | aterm %ARROW term                                 {% ([     dom,  ,cod ]) => All(null,dom,cod)    %}
+  | id              %FATARROW term                    {% ([ id,       ,body]) => Lam(id,Joker(),body) %}
+  | id %COLON aterm %FATARROW term                    {% ([ id,,type, ,body]) => Lam(id,type,body)    %}
+  | %LEFTPAR id %COLON aterm %RIGHTPAR %FATARROW term {% ([,id,,type,,,body]) => Lam(id,type,body)    %}
   | %LEFTPAR id %COLON aterm %DEF aterm %RIGHTPAR %FATARROW term
-    {% ([,id,,type,,val,,,body]) => PApp(Lam(id,type,body), val) %}
+    {% ([,id,,type,,val,,,body]) => App(Lam(id,type,body), val) %}

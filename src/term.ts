@@ -16,8 +16,25 @@ type TermNoApp =
 // A Joker means different things depending on the context:
 // - In a LHS : it is an unnamed fully applied meta-var that doesn't occur on the RHS. [target] is an expected type
 // - In a term : it is an unknown term that is meant to be inferred (and repalced in place) at typechecking.
-type Term = TermNoApp
-| { c: 'App', func:Term, argm:Term};
+
+type GeneralTerm<T> =
+  { c: 'Knd' }
+| { c: 'Typ' }
+| { c: 'All', name:string|null, dom:GeneralTerm<T>, cod:GeneralTerm<T>}
+| { c: 'Lam', name:string, type:GeneralTerm<T>, body:GeneralTerm<T>}
+| { c: 'Var', index:number, preferred_name:string|null}
+| { c: 'Ref', name:string}
+| { c: 'MVar', name:string|number|null, args:GeneralTerm<T>[] }
+| { c: 'Jok' }
+| { c: 'App', func:GeneralTerm<T>, argm:GeneralTerm<T>}
+| T;
+type Term = GeneralTerm<never>;
+
+type PreConst =
+  { c: 'PreRef'; name:string}
+| { c: 'PreScope'; name:string};
+
+type PreTerm = GeneralTerm<PreConst>;
 
 type PureTerm =
   { c: 'Knd' }
@@ -28,82 +45,49 @@ type PureTerm =
 | { c: 'Lam', name:string, type:PureTerm, body:PureTerm}
 | { c: 'App', func:PureTerm, argm:PureTerm};
 
-type PreTerm =
-  { c: 'Knd' }
-| { c: 'Typ' }
-| { c: 'Var', index:number, preferred_name:string|null}
-| { c: 'MVar', name:string|number|null, args:PreTerm[] }
-| { c: 'All', name:string|null, dom:PreTerm, cod:PreTerm}
-| { c: 'Ref', name:string}
-| { c: 'Lam', name:string, type:PreTerm, body:PreTerm}
-| { c: 'App', func:PreTerm, argm:PreTerm}
-| { c: 'PreRef'; name:string}
-| { c: 'PreScope'; name:string}
-| { c: 'Jok' };
 
-// A preterm is an ADT represented by a JSON
-function PTyp(): PreTerm {
+// A term is an ADT represented by a JSON
+function Typ(): GeneralTerm<any> {
   return { c: 'Typ' };
 }
-function PKnd(): PreTerm {
+function Knd(): GeneralTerm<any> {
   return { c: 'Knd' };
 }
-function PVar(index: number, preferred_name: string | null = null): PreTerm {
+function Var(index: number, preferred_name: string | null = null): GeneralTerm<any> {
   return { c: 'Var', index, preferred_name };
 }
-function PRef(name: string): PreTerm {
+function Ref(name: string): GeneralTerm<any> {
   return { c: 'Ref', name };
 }
-function PAll(name: string|null, dom: PreTerm, cod: PreTerm): PreTerm {
+function All<T>(name: string|null, dom: GeneralTerm<T>, cod: GeneralTerm<T>): GeneralTerm<T> {
   return { c: 'All', name, dom, cod };
 }
-function PLam(name: string, type: PreTerm, body: PreTerm): PreTerm {
+function Lam<T>(name: string, type: GeneralTerm<T>, body: GeneralTerm<T>): GeneralTerm<T> {
   return { c: 'Lam', name, type, body };
 }
-function PApp(func: PreTerm, argm: PreTerm): PreTerm {
+function App<T>(func: GeneralTerm<T>, argm: GeneralTerm<T>): GeneralTerm<T> {
   return { c: 'App', func, argm };
 }
-function PMVar(name: string | number | null = null, args: PreTerm[] = []): PreTerm { return { c: 'MVar', name, args }; }
-function Joker(): Term { return { c: 'Jok' }; }
+// Chains applications:  app(a,[b,c,d])  returns  App(App(App(a,b),c),d)
+function app<T>(func: GeneralTerm<T>, args: GeneralTerm<T>[]) : GeneralTerm<T> {
+  return args.reduce(App, func);
+}
+
+// A pattern is a term extended with (potentially anonymous) meta-variables
+// A "joker" is an anonym fully applied meta-variable. A default name and the full list of args are assigned at scoping.
+function MVar<T>(name: string | number | null = null, args: GeneralTerm<T>[] = []): GeneralTerm<T> {
+  return { c: 'MVar', name, args };
+}
+function Joker(): GeneralTerm<any> { return { c: 'Jok' }; }
 
 // Pre-scoping objects that can be either references or locally bound variables
 function PreScope(name: string) : PreTerm { return { c: 'PreScope', name }; }
 function PreRef(name: string) : PreTerm { return { c: 'PreRef', name }; }
 
-
-// A term is an ADT represented by a JSON
-function Typ(): Term {
-  return { c: 'Typ' };
-}
-function Knd(): Term {
-  return { c: 'Knd' };
-}
-function Var(index: number, preferred_name: string | null = null): Term {
-  return { c: 'Var', index, preferred_name };
-}
-function Ref(name: string): Term {
-  return { c: 'Ref', name };
-}
-function All(name: string|null, dom: Term, cod: Term): Term {
-  return { c: 'All', name, dom, cod };
-}
-function Lam(name: string, type: Term, body: Term): Term {
-  return { c: 'Lam', name, type, body };
-}
-function App(func: Term, argm: Term): Term {
-  return { c: 'App', func, argm };
-}
-// Chains applications:  app(a,[b,c,d])  returns  App(App(App(a,b),c),d)
-function app(func: Term, args: Term[]) { return args.reduce(App, func); }
-
-// A pattern is a term extended with (potentially anonymous) meta-variables
-// A "joker" is an anonym fully applied meta-variable. A default name and the full list of args are assigned at scoping.
-function MVar(name: string | number | null = null, args: Term[] = []): Term { return { c: 'MVar', name, args }; }
-
 // Returns the head of a term together with the list of its arguments *in reverse order*
 function get_head(t: Term) : [TermNoApp, Term[]] {
   const args = [];
-  while (t.c == 'App') {
+  while (t.c === 'App') {
     args.push(t.argm);
     t = t.func;
   }

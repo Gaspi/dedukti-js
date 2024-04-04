@@ -97,6 +97,15 @@ class Environment {
     const self = this;
     function s(e:PreTerm, ctx:CtxtT<null>) : Term {
       switch (e.c) {
+        case "Knd":
+        case "Typ":
+        case "Var":
+        case "Ref": return e;
+        case "All": return All(e.name, s(e.dom, ctx), s(e.cod, extend(ctx, [e.name,null])));
+        case "Lam": return Lam(e.name, e.type.c === 'Jok' ? e.type : s(e.type, ctx), s(e.body, extend(ctx, [e.name,null])));
+        case "App": return App(s(e.func, ctx), s(e.argm, ctx))
+        case "MVar": return MVar(e.name, e.args.map((a)=>s(a,ctx)));
+        case "Jok": return lhs ? MVar( self.fresh_name() , [...Array( ctx_size(ctx) ).keys()].map((i)=>Var(i))) : e;
         // Variable, meta-variable or symbol to scope
         case "PreScope":
           const ind = index_of(ctx,e.name);
@@ -106,26 +115,8 @@ class Environment {
         // (Meta-)term constructors
         case "PreRef": // Previously defined or loaded reference to locate in the environment
           return Ref(self.do_get(namespace+(namespace&&".")+e.name).fullname);
-        case "All":
-          e.dom = s(e.dom, ctx);
-          e.cod = s(e.cod, extend(ctx, [e.name,null]));
-          break;
-        case "Lam":
-          e.type = e.type.c === 'Jok' ? e.type : s(e.type, ctx);
-          e.body = s(e.body, extend(ctx, [e.name,null]));
-          break;
-        case "App":
-          e.func = s(e.func, ctx);
-          e.argm = s(e.argm, ctx);
-          break;
-        case "Jok":
-          return lhs ? MVar( self.fresh_name() , [...Array( ctx_size(ctx) ).keys()].map((i)=>Var(i))) : e;
-        case "MVar":
-          for (let i = 0; i < e.args.length; i++) {
-            e.args[i] = s(e.args[i],ctx);
-          }
+        default: assertNever(e);
       }
-      return (e as Term);
     }
     return s(term, context);
   }

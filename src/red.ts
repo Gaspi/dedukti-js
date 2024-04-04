@@ -1,5 +1,3 @@
-//var logdepth=0;
-
 function filter_rules(rules:ExRule[], arity:number) : [ExRule[], number] {
   const res = [];
   let max = -1;
@@ -287,11 +285,10 @@ class ComplexMatch {
     this.map = map;
   }
   meta_apply(args:ShiftedState[]) : ShiftedState {
+    console.log(this, args);
     const subst = this.map.map( (i) => (i === undefined ? neverAccessedState : args[i]) );
-    // Note : new VarState(0) is a placeholder but it should in fact never be accessed
-    // 
-    const ctxt = new Context(new Map(), 0, subst);
-    return new State(this.term, ctxt).getShifted(0);
+    // Note : neverAccessedState is a placeholder but it should in fact never be accessed
+    return new Context(new Map(), 0, subst).statify(this.term);
   }
 }
 
@@ -609,7 +606,7 @@ class ReductionEngine {
   whnf_state(s:ShiftedState) : ShiftedState {
     while (true) {
       const state : State = s.state;
-      debug.log(`WHNF: ${s.pp()}`);
+      //debug.log(`WHNF: ${s.pp()}`);
       while (state.head.c === "App") {
         // Push the state version of the argument on the stack
         state.stack.push( new State(state.head.argm, state.ctxt).getShifted(0) );
@@ -666,19 +663,19 @@ class ReductionEngine {
     const truncated_stack = state.stack.slice(state.stack.length-dtree.arity);
     // Running the decision tree with the given args (in order)
 
-    debug.log(`Rewriting: ${pp_term(state.to_term())}`);
-    debug.increment();
+    //debug.log(`Rewriting: ${pp_term(state.to_term())}`);
+    //debug.increment();
     let [rule, meta_subst] = this.exec_dtree(dtree.tree, truncated_stack);
-    debug.decrement();
+    //debug.decrement();
 
     if (!rule) {
-      debug.log("NoRew");
+      //debug.log("NoRew");
       return null;
     }
     state.head = rule.rhs;
     state.stack = state.stack.slice(0,state.stack.length-rule.stack.length);
     state.ctxt = new Context(meta_subst);
-    debug.log(`RW:${rule.name} > ${pp_term(state.to_term())}`);
+    //debug.log(`RW:${rule.name} > ${pp_term(state.to_term())}`);
     return rule.name;
   }
 
@@ -718,7 +715,6 @@ class ReductionEngine {
         const m = dtree.match[i];
         const matched_state = stack[m.index];
         if (!(matched_state instanceof ShiftedState)) {
-          console.log("[red.ts] This should not happen !");
           throw("[red.ts] This should not happen !");
         }
         let matched;
