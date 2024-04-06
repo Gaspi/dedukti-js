@@ -1,27 +1,23 @@
 # In browser Dedukti
 
-## Dependencies
+## Install dependencies
 
 ```sh
-git clone git@github.com:kach/nearley.git
-git clone git@github.com:no-context/moo.git
-npm install -g nearley
-cp ./nearley/lib/nearley.js ./ressources/
-cp ./moo/moo.js ./ressources/
+npm install
 ```
 
 ## Build
 
 ```sh
-make Q=
+npm run compile
 ```
 
 ## Run
 
 ```sh
-cd build
 python3 -m http.server
 ```
+Then open `http://localhost:8000/`.
 
 
 ## Refresh codejar files

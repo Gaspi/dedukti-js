@@ -125,15 +125,16 @@ function compute_dtree(m:RuleMatrix) : DTreeNode {
 
 function specialize_row(cols:Term[], j:number, cons:string|null, name:string|number|null, extra_cols:number) {
   const [pat,stack] = get_head(cols[j] as Term);
-  if (pat.c != cons) { return null; }
   switch (pat.c) {
     case 'MVar':
     case 'Jok': return cols.concat(Array(extra_cols).fill(Joker()));
     case 'Var':
-      if (pat.index !== name || stack.length !== extra_cols) { return null; }
+      if (cons !== 'Var' || pat.index !== name || stack.length !== extra_cols) { return null; }
       break;
     case 'Ref':
-      if (pat.name  !== name || stack.length !== extra_cols) { return null; }
+      if (cons !== 'Ref' || pat.name  !== name || stack.length !== extra_cols) { return null; }
+    default:
+      if (cons !== pat.c) { return null; }
   }
   const ncols = cols.concat( pat.c === 'Lam' ? [pat.body] : stack );
   ncols[j] = Joker();
