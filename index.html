@@ -81,8 +81,6 @@
   crossorigin="anonymous"
   onerror="this.onerror=null;this.integrity=null;this.src='lib/cdn.jsdelivr.net_npm_bootstrap@4.5.3_dist_js_bootstrap.bundle.min.js';">
 </script>
-<script src="./build/bundle.js"></script>
-<!--
 <script src="./build/src/utils.js"></script>
 <script src="./build/src/term.js"></script>
 <script src="./build/src/context.js"></script>
@@ -97,7 +95,6 @@
 <script src="./build/resources/nearley.js"></script>
 <script src="./build/resources/codejar.js"></script>
 <script src="./build/resources/linenumbers.js"></script>
--->
 <script>
 // Standard libraries
 const default_load = 'examples/intro.dk';
@@ -333,7 +330,9 @@ function log(status,ln,title,msg) {
     err :'danger',
   }[status];
   div.classList.add('alert-'+tag);
-  logs.appendChild(div);
+  //logs.appendChild(div);
+  //logs.insertBefore(div, logs.firstChild);
+  logs.insertAdjacentElement('afterbegin', div);
   if (ln>0) {
     const hovering = div.cloneNode();
     get('editor-wrapper').appendChild(hovering);
@@ -417,7 +416,8 @@ window.onload = function () {
     {
       STRING: grammar.Lexer.groups.map(function (g) {
           const ng = Object.assign({}, g); // Deep copy
-          ng.value = txt => `<span class="KW ${g.defaultType}">${txt}</span>`;
+          const pre = `<span class="KW ${g.defaultType}">`;
+          ng.value = txt => pre+txt+'</span>';
           return ng;
         }),
       myError: moo.error

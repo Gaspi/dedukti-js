@@ -11,7 +11,7 @@
     "nearley": "^2.20.1"
   },
   "scripts": {
-    "clean": "del /Q \"./build/src\" \"./build/resources\" \"./build/bundle.js\"",
+    "clean": "del /Q \"./build/src\" \"./build/resources\"",
     "generate": "nearleyc src/grammar.ne -o src/grammar.ts",
     "compile": "npm run clean && npm run generate && npx tsc",
     "postbuild": "cp package.json dist/package.json && cd dist && npm install --only=production"

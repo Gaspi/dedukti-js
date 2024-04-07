@@ -78,10 +78,7 @@ class Environment {
     if (ins.def ) { ins.def  = this.scope(ins.def , ins.ctx, namespace); }
     if (ins.lhs ) { ins.lhs  = this.scope(ins.lhs , ins.ctx, namespace, ins.c==='Rew'); }
     if (ins.rhs ) { ins.rhs  = this.scope(ins.rhs , ins.ctx, namespace); }
-    if (namespace) {
-      if (ins.name ) { ins.name   = `${namespace}.${ins.name}` ; }
-      if (ins.alias) { ins.alias  = `${namespace}.${ins.alias}`; }
-    }
+    if (ins.name && namespace) { ins.name = `${namespace}.${ins.name}` ; }
   }
 
   // Scoping of context, potentially in place.

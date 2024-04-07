@@ -175,12 +175,12 @@ class Signature {
           if (!load) { fail('Require',"Current setup does not support `#REQUIRE`."); }
           for (const log of
             this.check_instructions( load(ins.module), load,
-              ins.alias ? ins.alias+(namespace&&'.')+namespace : namespace,
+              ins.alias ? (namespace ? namespace+"." : "")+ins.alias : namespace,
               ins_stack = ins_stack.concat(ins) )
           ) {
             yield log;
           }
-          yield { status:'ok', title:"Require", msg:"Module `"+ins.module+"` successfully loaded." };
+          yield { status:'ok', title:"Require", msg:`Module [${ins.module}] successfully loaded.` };
           break;
         case "DebugOn":
           debug.enable_log();
