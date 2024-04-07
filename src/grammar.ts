@@ -23,6 +23,7 @@ declare var CMD_DEBUGON: any;
 declare var CMD_DEBUGOFF: any;
 declare var ID: any;
 declare var MID: any;
+declare var QID: any;
 declare var END: any;
 declare var LEFTSQU: any;
 declare var RIGHTSQU: any;
@@ -33,7 +34,6 @@ declare var RIGHTPAR: any;
 declare var JOKER: any;
 declare var TYPE: any;
 declare var KIND: any;
-declare var QID: any;
 declare var DB_INDEX: any;
 declare var ARROW: any;
 declare var FATARROW: any;
@@ -174,6 +174,7 @@ const grammar: Grammar = {
     {"name": "line", "symbols": [(lexer.has("CMD_DEBUGOFF") ? {type: "CMD_DEBUGOFF"} : CMD_DEBUGOFF), "e"], "postprocess": ([              ,e]) => CmdDebugOff(e)},
     {"name": "id", "symbols": [(lexer.has("ID") ? {type: "ID"} : ID)], "postprocess": ([id ]) =>  id.value},
     {"name": "mid", "symbols": [(lexer.has("MID") ? {type: "MID"} : MID)], "postprocess": ([mid]) => mid.value.substring(1,mid.value.length-1)},
+    {"name": "mid", "symbols": [(lexer.has("QID") ? {type: "QID"} : QID)], "postprocess": ([qid]) => qid.value},
     {"name": "e", "symbols": [(lexer.has("END") ? {type: "END"} : END)], "postprocess": ([e  ]) =>   e.line},
     {"name": "alias", "symbols": [(lexer.has("LEFTSQU") ? {type: "LEFTSQU"} : LEFTSQU), "id", (lexer.has("RIGHTSQU") ? {type: "RIGHTSQU"} : RIGHTSQU)], "postprocess": ([,id,]) => id},
     {"name": "assign", "symbols": ["id", (lexer.has("COLON") ? {type: "COLON"} : COLON), "term"], "postprocess": ([name,,type]) => [name,type]},

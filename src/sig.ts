@@ -94,7 +94,7 @@ class Signature {
   }
 
   // Process a single unscoped instruction
-  *check_instruction(ins : Instruction, load : ((mod:string)=>Instruction[]) | null = null, namespace:string="", ins_stack : Instruction[] = []) : Generator<Message> {
+  *check_instruction(ins : Instruction, load : ((mod:string)=>Instruction[]) | null = null, namespace:string="", ins_stack : Instruction[] = []) : Generator<Message, void, void> {
     try {
       this.env.scope_instruction(ins, namespace);
       switch (ins.c) {

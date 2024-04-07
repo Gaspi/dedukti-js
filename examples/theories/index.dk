@@ -1,0 +1,9 @@
+#REQUIRE theories/pure_lambda_calculus[pure_lambda_calculus];
+
+#REQUIRE theories/FOL[FOL];
+#REQUIRE theories/FO_cons[FO_cons];
+#REQUIRE theories/FO_rew[FO_rew];
+#REQUIRE theories/sttfa[sttfa];
+#REQUIRE theories/cc[cc];
+#REQUIRE theories/theorems/FO_thm[FO_thm];
+#REQUIRE theories/theorems/FO_nat[FO_nat];

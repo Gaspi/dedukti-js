@@ -1,0 +1,17 @@
+
+#REQUIRE tests/basics[basics];
+#REQUIRE tests/arities[arities];
+#REQUIRE tests/ignored_cstr[ignored_cstr];
+#REQUIRE tests/readable_nat[readable_nat];
+
+#REQUIRE tests/SR/SR_OK_1[SR_OK_1];
+#REQUIRE tests/SR/SR_OK_2[SR_OK_2];
+#REQUIRE tests/SR/SR_OK_3[SR_OK_3];
+#REQUIRE tests/SR/SR_OK_4[SR_OK_4];
+#REQUIRE tests/SR/SR_sat_2[SR_sat_2];
+#REQUIRE tests/SR/SR_sat_bv1[SR_sat_bv1];
+#REQUIRE tests/SR/SR_sat_bv2[SR_sat_bv2];
+#REQUIRE tests/SR/SR_sat_eq1[SR_sat_eq1];
+#REQUIRE tests/SR/SR_sat_eq2[SR_sat_eq2];
+#REQUIRE tests/SR/SR_cool_ex[SR_cool_ex];
+

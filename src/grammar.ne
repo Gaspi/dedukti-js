@@ -95,6 +95,7 @@ line ->
 
 id  -> %ID  {% ([id ]) =>  id.value %}
 mid -> %MID {% ([mid]) => mid.value.substring(1,mid.value.length-1)  %}
+  | %QID    {% ([qid]) => qid.value %}
 e   -> %END {% ([e  ]) =>   e.line  %}
 alias -> %LEFTSQU id %RIGHTSQU {% ([,id,]) => id %}
 assign -> id %COLON term {% ([name,,type]) => [name,type] %}

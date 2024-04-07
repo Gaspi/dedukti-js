@@ -81,6 +81,8 @@
   crossorigin="anonymous"
   onerror="this.onerror=null;this.integrity=null;this.src='lib/cdn.jsdelivr.net_npm_bootstrap@4.5.3_dist_js_bootstrap.bundle.min.js';">
 </script>
+<script src="./build/bundle.js"></script>
+<!--
 <script src="./build/src/utils.js"></script>
 <script src="./build/src/term.js"></script>
 <script src="./build/src/context.js"></script>
@@ -95,13 +97,14 @@
 <script src="./build/resources/nearley.js"></script>
 <script src="./build/resources/codejar.js"></script>
 <script src="./build/resources/linenumbers.js"></script>
+-->
 <script>
 // Standard libraries
 const default_load = 'examples/intro.dk';
 const quick_loads = [
   'intro.dk',
   'intro_advanced.dk',
-  { folder:'theories', content: [
+  { folder:'theories', index:true, content: [
     'pure_lambda_calculus.dk',
     'FOL.dk',
     'FO_cons.dk',
@@ -117,7 +120,7 @@ const quick_loads = [
       'church.dk',
       'nat_compute.dk',
     ] },
-  { folder:'tests', content: [
+  { folder:'tests', index:true, content: [
     'basics.dk',
     'arities.dk',
     'ignored_cstr.dk',
@@ -144,13 +147,14 @@ const quick_loads = [
     'solve_medium.dk',
     'solve_hardest.dk',
   ] },
-  { folder:'SR', content: [
+  { folder:'SR', index:true, content: [
     'SR_1.dk',
     'SR_2.dk',
     'SR_3.dk',
     'SR_4.dk',
     'SR_5.dk',
   ] },
+  "all.dk",
 ];
 
 // Call fn after DOM is finished updating
@@ -169,10 +173,14 @@ function add_quick_load(e, element, prefix) {
     a.innerText = e.folder;
     const ul = li.appendChild(document.createElement('ul'));
     ul.classList.add("dropdown-menu", "dropdown-submenu");
-    add_quick_loads(e.content, ul, prefix+"/"+e.folder);
+    const folder_prefix = `${prefix}/${e.folder}`;
+    if (e.index) {
+      a.onclick = ()=>load_url(`${folder_prefix}/index.dk`);
+    }
+    add_quick_loads(e.content, ul, folder_prefix);
   } else {
     a.innerText = e;
-    a.onclick = ()=>load_url(prefix+'/'+e);
+    a.onclick = ()=>load_url(`${prefix}/${e}`);
   }
   element.prepend(li);
 }
@@ -380,7 +388,7 @@ function load_module(module_name) {
   // Synchronous request
   xhttp.open("GET", url, false);
   xhttp.send();
-  if (!res) { fail("Load","Failed to load file `"+url+"`."); }
+  if (!res) { fail("Load",`Failed to load URL: ${url}`); }
   return parse(res);
 }
 
@@ -405,10 +413,11 @@ window.onload = function () {
   editor.addEventListener("dragenter", dragenter, false);
   editor.addEventListener("dragover", dragover, false);
   editor.addEventListener("drop", drop, false);
-  highlighter = moo.compile({
-      STRING:grammar.Lexer.groups.map(function (g) {
+  highlighter = moo.compile(
+    {
+      STRING: grammar.Lexer.groups.map(function (g) {
           const ng = Object.assign({}, g); // Deep copy
-          ng.value = txt => '<span class="KW '+g.defaultType+'">'+txt+'</span>';
+          ng.value = txt => `<span class="KW ${g.defaultType}">${txt}</span>`;
           return ng;
         }),
       myError: moo.error

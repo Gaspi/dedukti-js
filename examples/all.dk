@@ -1,0 +1,10 @@
+
+
+#REQUIRE intro[intro];
+#REQUIRE intro_advanced[intro_advanced];
+#REQUIRE theories/index;
+#REQUIRE computations/church[church];
+#REQUIRE tests/index;
+#REQUIRE sudoku/solve_medium[solve_medium];
+#REQUIRE SR/index;
+

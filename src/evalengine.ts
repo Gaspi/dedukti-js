@@ -1,4 +1,4 @@
-
+/// <reference path="queue.ts" />
 
 const todo = new Queue<[(...args:any[])=>void, any[]]>();
 
