@@ -1,4 +1,11 @@
 {
+  "name": "dedukti-js",
+  "license": "MIT",
+  "scripts": {
+    "generate": "nearleyc src/grammar.ne -o src/grammar.ts",
+    "compile": "npm run clean && npm run generate && npx tsc",
+    "postbuild": "cp package.json dist/package.json && cd dist && npm install --only=production"
+  },
   "dependencies": {
     "@types/moo": "^0.5.9",
     "@types/nearley": "^2.11.5",
@@ -9,11 +16,5 @@
   "devDependencies": {
     "@types/node": "^20.12.5",
     "nearley": "^2.20.1"
-  },
-  "scripts": {
-    "clean": "del /Q \"./build/src\" \"./build/resources\"",
-    "generate": "nearleyc src/grammar.ne -o src/grammar.ts",
-    "compile": "npm run clean && npm run generate && npx tsc",
-    "postbuild": "cp package.json dist/package.json && cd dist && npm install --only=production"
   }
 }
